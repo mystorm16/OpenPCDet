@@ -1,0 +1,11 @@
+/data/
+/docker/
+/docs/
+/ckpt/
+/build/
+/__init__.py
+/LICENSE
+/README.md
+/requirements.txt
+/setup.py
+/output/

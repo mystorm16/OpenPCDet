@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="412118b7-bf11-47a3-9254-b1a8da23c141" name="porser 3090">
+        <fileTransfer rootFolder="/home/shenyou" accessType="SFTP" host="219.216.99.105" port="22" sshConfigId="8c0f770a-7594-4847-8df1-1d2ee512e94d" sshConfig="shenyou@219.216.99.105:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

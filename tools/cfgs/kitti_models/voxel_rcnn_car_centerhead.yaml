@@ -1,0 +1,247 @@
+CLASS_NAMES: ['Car']
+
+DATA_CONFIG:
+    _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
+
+# sy add
+#    DATA_PROCESSOR:
+#        - NAME: mask_points_and_boxes_outside_range
+#          REMOVE_OUTSIDE_BOXES: True
+#
+#        - NAME: shuffle_points
+#          SHUFFLE_ENABLED: {
+#              'train': True,
+#              'test': False
+#          }
+#
+#        - NAME: det_transform_points_to_voxels  # 点云转voxel
+#          VOXEL_SIZE: [ 0.352, 0.45454, 0.4]
+#          MAX_POINTS_PER_VOXEL: 12
+#          MAX_NUMBER_OF_VOXELS: {
+#                'train': 20000,
+#                'test': 40000
+#            }
+#
+#        - NAME: transform_points_to_voxels
+#          VOXEL_SIZE: [ 0.05, 0.05, 0.1 ]
+#          MAX_POINTS_PER_VOXEL: 5
+#          MAX_NUMBER_OF_VOXELS: {
+#              'train': 16000,
+#              'test': 40000
+#          }
+# sy add end
+
+    DATA_AUGMENTOR:
+        DISABLE_AUG_LIST: ['placeholder']
+        AUG_CONFIG_LIST:
+            - NAME: gt_sampling
+              USE_ROAD_PLANE: True
+              DB_INFO_PATH:
+                  - kitti_dbinfos_train.pkl
+              PREPARE: {
+                 filter_by_min_points: ['Car:5'],
+                 filter_by_difficulty: [-1],
+              }
+
+              SAMPLE_GROUPS: ['Car:15']
+              NUM_POINT_FEATURES: 4
+              DATABASE_WITH_FAKELIDAR: False
+              REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
+              LIMIT_WHOLE_SCENE: False
+
+            - NAME: random_world_flip
+              ALONG_AXIS_LIST: ['x']
+
+            - NAME: random_world_rotation
+              WORLD_ROT_ANGLE: [-0.78539816, 0.78539816]
+
+            - NAME: random_world_scaling
+              WORLD_SCALE_RANGE: [0.95, 1.05]
+
+MODEL:
+    NAME: VoxelRCNN
+
+    VFE:
+        NAME: MeanVFE
+
+    BACKBONE_3D:
+        NAME: VoxelBackBone8x
+
+    MAP_TO_BEV:
+        NAME: HeightCompression
+        NUM_BEV_FEATURES: 256
+
+    BACKBONE_2D:
+        NAME: BaseBEVBackbone
+
+        #     centerhead+kitti的配置
+#        LAYER_NUMS: [ 5 ]  # 有一个block，里面有5个隐藏层
+#        LAYER_STRIDES: [ 1 ]  # block里每个隐藏层的步长
+#        NUM_FILTERS: [ 128 ]  # 每个隐藏层的卷积核数
+#        UPSAMPLE_STRIDES: [ 2 ]  # 上采样步长
+#        NUM_UPSAMPLE_FILTERS: [ 256 ]  # 上采样卷积核个数
+
+#       kitti+voxelrcnn的配置
+#        LAYER_NUMS: [ 5, 5 ]  # 有两个block 每个block有5个隐藏层（每层就是一个feature map）
+#        LAYER_STRIDES: [ 1, 2 ]  # block的步长
+#        NUM_FILTERS: [ 64, 128 ]  # 每个block中隐藏层的卷积核个数 也就是每层用多少个卷积去卷
+#        UPSAMPLE_STRIDES: [ 1, 2 ]  #两个上采样block的上采样步长
+#        NUM_UPSAMPLE_FILTERS: [ 128, 128 ]  # 上采样中的卷积
+
+#       waymo+centerhead+voxelrcnn的配置
+        LAYER_NUMS: [5, 5]  # 有两个block 每个block有5个隐藏层（每层就是一个feature map）
+        LAYER_STRIDES: [1, 2]  # block的步长
+        NUM_FILTERS: [128, 256]  # 每个block中隐藏层的卷积核个数 也就是每层用多少个卷积去卷
+        UPSAMPLE_STRIDES: [1, 2]  #两个上采样block的上采样步长
+        NUM_UPSAMPLE_FILTERS: [256, 256]  # 上采样中的卷积
+
+    DENSE_HEAD:
+        NAME: CenterHead
+        CLASS_AGNOSTIC: False
+
+        CLASS_NAMES_EACH_HEAD: [
+            [ 'Car' ]
+        ]
+
+        SHARED_CONV_CHANNEL: 64  # 把BEV feature map降维到64
+        USE_BIAS_BEFORE_NORM: True  # 用bias
+        NUM_HM_CONV: 2  # 一层固定是64个卷积核，看从feature map输出hm用几个卷积层
+        SEPARATE_HEAD_CFG:
+            HEAD_ORDER: [ 'center', 'center_z', 'dim', 'rot' ]
+            HEAD_DICT: {
+                'center': { 'out_channels': 2, 'num_conv': 2 },
+                'center_z': { 'out_channels': 1, 'num_conv': 2 },
+                'dim': { 'out_channels': 3, 'num_conv': 2 },
+                'rot': { 'out_channels': 2, 'num_conv': 2 },
+            }
+
+        TARGET_ASSIGNER_CONFIG:  # 这里的配置和生成热图真值有关
+            FEATURE_MAP_STRIDE: 8  # 应该是决定缩放倍数
+            NUM_MAX_OBJS: 100  # 一帧点云中最多出现几个物体
+            GAUSSIAN_OVERLAP: 0.1  # 高斯圆的参数
+            MIN_RADIUS: 2
+
+        LOSS_CONFIG:
+            LOSS_WEIGHTS: {
+                'cls_weight': 1.0,
+#                'cls_weight': 0.2,
+                'loc_weight': 2.0,
+#                'loc_weight': 0.4,
+                'code_weights': [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+            }
+
+        POST_PROCESSING:
+#            SCORE_THRESH: 0.1  # 找完热图最大的500个位置之后，再用SCORE_THRESH作为阈值筛一下
+            SCORE_THRESH: 0.1  # sy_add  用热图预测得分，过滤一些实在垃圾的位置
+            POST_CENTER_LIMIT_RANGE: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]  # 限制中心点范围
+#            POST_CENTER_LIMIT_RANGE: [ -5.2, -5.2, -2, 5.2, 5.2, 4 ]  # sy_add
+            MAX_OBJ_PER_SAMPLE: 400  # 在预测的heatmap里找值最大的500个位置  理论上这里改大能提召回率
+#            MAX_OBJ_PER_SAMPLE: 100  # sy_add 找hm值最大的2000个位置
+
+            NMS_CONFIG:  # 经过hm score作为阈值滤之后，再用NMS滤一下，因为NMS适合在预测box丰富的场景使用，所以考虑调高hm阈值和最大检测数量
+                NMS_TYPE: nms_gpu
+#                NMS_THRESH: 0.7  # 3D iou大于阈值的都删了
+                NMS_THRESH: 0.8   # sy_add  为了让送入第二阶段的128个box的正样本不都是大多来自同一个位置的，所以NMS一下
+                NMS_PRE_MAXSIZE: 4096  # 只针对场景中box score前4096名进行NMS，center base应该也用不着
+                NMS_POST_MAXSIZE: 512  # 限制nms之后场景中box的数量，这里感觉center base都用不着，因为pred box太少了，被滤的差不多了
+
+    ROI_HEAD:
+        NAME: VoxelRCNNHead
+        CLASS_AGNOSTIC: True
+
+        SHARED_FC: [256, 256]
+        CLS_FC: [256, 256]
+        REG_FC: [256, 256]
+        DP_RATIO: 0.3
+
+        NMS_CONFIG:  # 从第一阶段结果NMS 没用到
+            TRAIN:
+            TEST:
+
+        ROI_GRID_POOL:
+            FEATURES_SOURCE: ['x_conv2', 'x_conv3', 'x_conv4']
+            PRE_MLP: True
+            GRID_SIZE: 6
+            POOL_LAYERS:
+                x_conv2:
+                    MLPS: [[32, 32]]
+                    QUERY_RANGES: [[4, 4, 4]]
+                    POOL_RADIUS: [0.4]
+                    NSAMPLE: [16]
+                    POOL_METHOD: max_pool
+                x_conv3:
+                    MLPS: [[32, 32]]
+                    QUERY_RANGES: [[4, 4, 4]]
+                    POOL_RADIUS: [0.8]
+                    NSAMPLE: [16]
+                    POOL_METHOD: max_pool
+                x_conv4:
+                    MLPS: [[32, 32]]
+                    QUERY_RANGES: [[4, 4, 4]]
+                    POOL_RADIUS: [1.6]
+                    NSAMPLE: [16]
+                    POOL_METHOD: max_pool
+        TARGET_CONFIG:
+            BOX_CODER: ResidualCoder
+#            ROI_PER_IMAGE: 128  # 每帧点云最多有多少个前景ROI
+            ROI_PER_IMAGE: 96
+            FG_RATIO: 0.5  # 前景ROI的比例 这里是一半一半64个前景64个背景
+
+            SAMPLE_ROI_BY_EACH_CLASS: True
+            CLS_SCORE_TYPE: roi_iou
+
+            CLS_FG_THRESH: 0.75
+            CLS_BG_THRESH: 0.25
+            CLS_BG_THRESH_LO: 0.1
+            HARD_BG_RATIO: 0.8  # 困难背景数据（roi中与GT的iou大于等于0.1小于0.55的定义为难背景）的比例；roi中与GT的iou小于0.1定义为简单背景
+
+            REG_FG_THRESH: 0.55
+
+        LOSS_CONFIG:
+            CLS_LOSS: BinaryCrossEntropy
+            REG_LOSS: smooth-l1
+            CORNER_LOSS_REGULARIZATION: True
+            GRID_3D_IOU_LOSS: False
+            LOSS_WEIGHTS: {
+                'rcnn_cls_weight': 1.0,
+                'rcnn_reg_weight': 1.0,
+                'rcnn_corner_weight': 1.0,
+                'rcnn_iou3d_weight': 1.0,
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+            }
+
+    POST_PROCESSING:
+        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+        SCORE_THRESH: 0.3   # 用SCORE_THRESH就是先用预测得分滤一遍 排除很多空box
+        OUTPUT_RAW_SCORE: False
+
+        EVAL_METRIC: kitti
+
+        NMS_CONFIG:
+            MULTI_CLASSES_NMS: False
+            NMS_TYPE: nms_gpu
+            NMS_THRESH: 0.1
+            NMS_PRE_MAXSIZE: 4096
+            NMS_POST_MAXSIZE: 500
+
+
+OPTIMIZATION:
+    BATCH_SIZE_PER_GPU: 2
+    NUM_EPOCHS: 80
+
+    OPTIMIZER: adam_onecycle
+    LR: 0.01
+    WEIGHT_DECAY: 0.01
+    MOMENTUM: 0.9
+
+    MOMS: [0.95, 0.85]
+    PCT_START: 0.4
+    DIV_FACTOR: 10
+    DECAY_STEP_LIST: [35, 45]
+    LR_DECAY: 0.1
+    LR_CLIP: 0.0000001
+
+    LR_WARMUP: False
+    WARMUP_EPOCH: 1
+
+    GRAD_NORM_CLIP: 10
