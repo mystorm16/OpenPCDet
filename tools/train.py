@@ -129,9 +129,9 @@ def main():
     optimizer_lst.append(occ_optimizer)
     optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)
 
-    det_optimizer = build_optimizer(model, cfg.OPTIMIZATION, para_lst_name="det")
-    optimizer_lst.append(det_optimizer)
-    optim_cfg_lst.append(cfg.OPTIMIZATION)
+    center_optimizer = build_optimizer(model, cfg.CENTER_OPTIMIZATION, para_lst_name="center")
+    optimizer_lst.append(center_optimizer)
+    optim_cfg_lst.append(cfg.CENTER_OPTIMIZATION)
 
     # load checkpoint if it is possible
     start_epoch = it = 0
@@ -158,7 +158,7 @@ def main():
 
     lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
         optimizer_lst, total_iters_each_epoch=len(train_loader),
-        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.OPTIMIZATION.NUM_EPOCHS],
+        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.CENTER_OPTIMIZATION.NUM_EPOCHS],
         last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
     )
 

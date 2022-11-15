@@ -73,7 +73,8 @@ class DataProcessor(object):
         self.occ_dim = None
 
         self.voxel_generator_det = None
-        self.voxel_generator_200 = None
+        self.voxel_generator_occ = None
+        self.voxel_generator_center = None
 
         for cur_cfg in processor_configs:
             cur_processor = getattr(self, cur_cfg.NAME)(config=cur_cfg)
@@ -118,6 +119,70 @@ class DataProcessor(object):
         paddings_indicator = actual_num > max_num
         return paddings_indicator
 
+    # 第一阶段的occ voxel
+    def occ_transform_points_to_voxels(self, data_dict=None, config=None):
+        if data_dict is None:
+            occ_grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
+            self.occ_grid_size = np.round(occ_grid_size).astype(np.int64)
+            self.occ_voxel_size = config.VOXEL_SIZE
+            return partial(self.occ_transform_points_to_voxels, config=config)
+
+        if self.voxel_generator_occ is None:
+            self.voxel_generator_occ = VoxelGeneratorWrapper(
+                vsize_xyz=config.VOXEL_SIZE,
+                coors_range_xyz=self.point_cloud_range,
+                num_point_features=config.NUM_POINT_FEATURES,
+                max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
+                max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
+            )
+
+        points = data_dict['pre_rot_points'] if 'pre_rot_points' in data_dict else data_dict['points']
+        voxel_output = self.voxel_generator_occ.generate(points)
+        voxels, coordinates, num_points = voxel_output
+
+        if 'pre_rot_points' in data_dict:
+            noise_rotation = data_dict['rot_z'] * np.pi / 180
+            # draw_scenes(voxels.reshape(-1, 4))
+            voxels = common_utils.rotate_points_along_z(voxels, np.array([noise_rotation]))
+            # draw_scenes(voxels.reshape(-1, 4))
+            data_dict.pop('pre_rot_points')
+
+        data_dict['occ_voxels'] = voxels
+        data_dict['occ_voxel_coords'] = coordinates
+        data_dict['occ_voxel_num_points'] = num_points
+        return data_dict
+
+    # 第一阶段的center voxel
+    def center_transform_points_to_voxels(self, data_dict=None, config=None):
+        if data_dict is None:
+            center_grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
+            self.center_grid_size = np.round(center_grid_size).astype(np.int64)
+            self.center_voxel_size = config.VOXEL_SIZE
+            return partial(self.center_transform_points_to_voxels, config=config)
+
+        if self.voxel_generator_det is None:
+            self.voxel_generator_det = VoxelGeneratorWrapper(
+                vsize_xyz=config.VOXEL_SIZE,
+                coors_range_xyz=self.point_cloud_range,
+                num_point_features=config.NUM_POINT_FEATURES,
+                max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
+                max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
+            )
+
+        points = data_dict['points']
+        voxel_output = self.voxel_generator_det.generate(points)
+        voxels, coordinates, num_points = voxel_output
+
+        if not data_dict['use_lead_xyz']:
+            voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
+        # draw_scenes(voxels.reshape(-1, 4))
+
+        data_dict['center_voxels'] = voxels
+        data_dict['center_voxel_coords'] = coordinates
+        data_dict['center_voxel_num_points'] = num_points
+        return data_dict
+
+    # 第二阶段detection
     def det_transform_points_to_voxels(self, data_dict=None, config=None):
         if data_dict is None:
             det_grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
@@ -146,71 +211,6 @@ class DataProcessor(object):
         data_dict['det_voxel_coords'] = coordinates
         data_dict['det_voxel_num_points'] = num_points
         return data_dict
-
-    def transform_points_to_voxels_200(self, data_dict=None, config=None):
-        if data_dict is None:
-            occ_grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
-            self.occ_grid_size = np.round(occ_grid_size).astype(np.int64)
-            self.occ_voxel_size = config.VOXEL_SIZE
-            return partial(self.transform_points_to_voxels_200, config=config)
-
-        if self.voxel_generator_200 is None:
-            self.voxel_generator_200 = VoxelGeneratorWrapper(
-                vsize_xyz=config.VOXEL_SIZE,
-                coors_range_xyz=self.point_cloud_range,
-                num_point_features=config.NUM_POINT_FEATURES,
-                max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
-                max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
-            )
-
-        points = data_dict['pre_rot_points'] if 'pre_rot_points' in data_dict else data_dict['points']
-        voxel_output = self.voxel_generator_200.generate(points)
-        voxels, coordinates, num_points = voxel_output
-
-        if 'pre_rot_points' in data_dict:
-            noise_rotation = data_dict['rot_z'] * np.pi / 180
-            # draw_scenes(voxels.reshape(-1, 4))
-            voxels = common_utils.rotate_points_along_z(voxels, np.array([noise_rotation]))
-            # draw_scenes(voxels.reshape(-1, 4))
-            data_dict.pop('pre_rot_points')
-
-        data_dict['occ_voxels'] = voxels
-        data_dict['occ_voxel_coords'] = coordinates
-        data_dict['occ_voxel_num_points'] = num_points
-        return data_dict
-
-    # def transform_points_to_voxels_200(self, data_dict=None, config=None, voxel_generator200=None):
-    #     if data_dict is None:
-    #         voxel_generator200 = VoxelGeneratorWrapper(
-    #             vsize_xyz=config.VOXEL_SIZE,
-    #             coors_range_xyz=self.point_cloud_range,
-    #             num_point_features=config.NUM_POINT_FEATURES,
-    #             max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
-    #             max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
-    #         )
-    #         occ_grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
-    #         self.occ_grid_size = np.round(occ_grid_size).astype(np.int64)
-    #         self.occ_voxel_size = config.VOXEL_SIZE
-    #         return partial(self.transform_points_to_voxels_200, config=config, voxel_generator200=voxel_generator200)
-    #
-    #     points = data_dict['pre_rot_points'] if 'pre_rot_points' in data_dict else data_dict['points']
-    #     voxel_output = voxel_generator200.generate(points)
-    #     voxels, coordinates, num_points = voxel_output
-    #
-    #     if not data_dict['use_lead_xyz']:
-    #         voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
-    #
-    #     if 'pre_rot_points' in data_dict:
-    #         noise_rotation = data_dict['rot_z'] * np.pi / 180
-    #         # draw_scenes(voxels.reshape(-1, 4))
-    #         voxels = common_utils.rotate_points_along_z(voxels, np.array([noise_rotation]))
-    #         # draw_scenes(voxels.reshape(-1, 4))
-    #         data_dict.pop('pre_rot_points')
-    #
-    #     data_dict['occ_voxels'] = voxels
-    #     data_dict['occ_voxel_coords'] = coordinates
-    #     data_dict['occ_voxel_num_points'] = num_points
-    #     return data_dict
 
     def gen_pnt_label(self, data_dict=None, config=None):
         if data_dict is None:

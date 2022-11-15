@@ -90,14 +90,13 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
     if rank == 0:
         pbar = tqdm.tqdm(total=total_it_each_epoch, leave=leave_pbar, desc='train', dynamic_ncols=True)
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        parameter_lst = [model.module.occ_modules, model.module.det_modules]
+        parameter_lst = [model.center_modules, model.occ_modules]
     else:
-        parameter_lst = [model.occ_modules, model.det_modules]
+        parameter_lst = [model.center_modules, model.occ_modules]
 
     for cur_it in range(total_it_each_epoch):
         try:
             batch = next(dataloader_iter)
-            # print(1)
         except StopIteration:
             dataloader_iter = iter(train_loader)
             batch = next(dataloader_iter)
@@ -130,7 +129,7 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
 
         accumulated_iter += 1
         if len(cur_lr_lst) > 1:
-            disp_dict.update({'loss': loss.item(), 'lr_occ': cur_lr_lst[0], 'lr_det': cur_lr_lst[1]})
+            disp_dict.update({'loss': loss.item(), 'lr_occ': cur_lr_lst[0], 'lr_center': cur_lr_lst[1]})
         else:
             disp_dict.update({'loss': loss.item(), 'lr': cur_lr_lst[0]})
 

@@ -5,10 +5,10 @@ from .add_occ_template import AddOccTemplate
 
 
 class PassOccVox(AddOccTemplate):
-    def __init__(self, model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, det_voxel_size,
-                 det_grid_size, mode, voxel_centers, **kwargs):
-        super().__init__(model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, det_voxel_size,
-                         det_grid_size, mode, voxel_centers)
+    def __init__(self, model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, center_voxel_size,
+                 center_grid_size, mode, voxel_centers, **kwargs):
+        super().__init__(model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, center_voxel_size,
+                         center_grid_size, mode, voxel_centers)
 
     def forward(self, batch_dict, **kwargs):
         voxel_features, voxel_num_points, coords = batch_dict['occ_voxels'], batch_dict['occ_voxel_num_points'], \
@@ -27,9 +27,9 @@ class PassOccVox(AddOccTemplate):
         batch_dict["gt_points_xyz"] = batch_dict["points"][..., 1:4]
         batch_dict["gt_b_ind"] = batch_dict["points"][..., 0]
 
-        if 'det_voxel_coords' in batch_dict:
+        if 'center_voxel_coords' in batch_dict:
             batch_dict['voxels'], batch_dict['voxel_num_points'], batch_dict['voxel_coords'] = \
-                batch_dict['det_voxels'], batch_dict['det_voxel_num_points'], batch_dict['det_voxel_coords']
+                batch_dict['center_voxels'], batch_dict['center_voxel_num_points'], batch_dict['center_voxel_coords']
 
         if len(probs_lst) > 0:  # 前2048个预测结果
             occ_probs = probs_lst[0] if len(probs_lst) == 1 else torch.cat(probs_lst, axis=0)  # 大于占有概率阈值的体素
@@ -47,8 +47,8 @@ class PassOccVox(AddOccTemplate):
             batch_dict["occ_pnts"] = occ_pnts
             # draw_scenes(batch_dict['added_occ_xyz'].detach())
             occ_carte_coords = self.trans_voxel_grid(batch_dict["added_occ_xyz"], occ_coords[..., 0],
-                                                     self.det_voxel_size, self.det_grid_size,
-                                                     self.point_cloud_range)  # 从原始点云生成index
+                                                     self.center_voxel_size, self.center_grid_size,
+                                                     self.point_cloud_range)  # 从原始点云生成COORD
             # draw_scenes_voxel_a(occ_carte_coords)
             occ_pnts = self.assemble_occ_points(batch_dict["added_occ_xyz"], pnt_feat_dim, occ_probs)  # 补全上的点的坐标拼接占有概率
             if self.db_proj:
@@ -57,7 +57,7 @@ class PassOccVox(AddOccTemplate):
             gt_points, gt_voxel_coords = self.assemble_gt_vox_points(batch_dict)
             voxels, voxel_num_points, voxel_coords = self.combine_gt_occ_voxel_point(gt_points, gt_voxel_coords,
                                                                                      occ_pnts, occ_carte_coords,
-                                                                                     self.det_grid_size)  # 补全的点拼接到原始点云
+                                                                                     self.center_grid_size)  # 补全的点拼接到原始点云
             # draw_scenes(voxels.reshape(-1, 6).detach(), gt_boxes=batch_dict['gt_boxes'][0])
             batch_dict['voxels'], batch_dict['voxel_num_points'], batch_dict[
                 'voxel_coords'] = voxels, voxel_num_points, voxel_coords

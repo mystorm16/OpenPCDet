@@ -38,9 +38,9 @@ class DatasetTemplate(torch_data.Dataset):
             self.dataset_cfg.DATA_PROCESSOR, point_cloud_range=self.occ_point_cloud_range, training=self.training,
             occ_config=dataset_cfg.get('OCC', None), det_point_cloud_range=self.point_cloud_range)
         self.occ_dim = self.data_processor.occ_dim
-        self.det_grid_size = getattr(self.data_processor, 'det_grid_size', None)
-        self.det_voxel_size = getattr(self.data_processor, 'det_voxel_size', None)
 
+        self.center_grid_size = getattr(self.data_processor, 'center_grid_size', None)
+        self.center_voxel_size = getattr(self.data_processor, 'center_voxel_size', None)
         self.occ_grid_size = getattr(self.data_processor, 'occ_grid_size', None)
         self.occ_voxel_size = getattr(self.data_processor, 'occ_voxel_size', None)
         self.min_points_in_box = self.dataset_cfg.get("MIN_POINTS_IN_BOX", 0)

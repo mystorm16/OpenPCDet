@@ -4,7 +4,7 @@ from ...utils import coords_utils, vis_occ_utils, point_box_utils, common_utils
 import numpy as np
 
 class AddOccTemplate(nn.Module):
-    def __init__(self, model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, det_voxel_size, det_grid_size, mode, voxel_centers, **kwargs):
+    def __init__(self, model_cfg, data_cfg, point_cloud_range, occ_voxel_size, occ_grid_size, center_voxel_size, center_grid_size, mode, voxel_centers, **kwargs):
         super().__init__()
 
         self.model_cfg = model_cfg
@@ -19,8 +19,8 @@ class AddOccTemplate(nn.Module):
         self.occ_voxel_size = occ_voxel_size
         self.nvx, self.nvy, self.nvz = occ_voxel_size
         self.occ_grid_size = occ_grid_size
-        self.det_grid_size = det_grid_size
-        self.det_voxel_size = torch.tensor(det_voxel_size, device="cuda", dtype=torch.float32)
+        self.center_grid_size = center_grid_size
+        self.center_voxel_size = torch.tensor(center_voxel_size, device="cuda", dtype=torch.float32)
 
         self.occ_point_cloud_range = data_cfg.OCC.POINT_CLOUD_RANGE
         self.occ_point_cloud_range_tensor = torch.tensor(self.occ_point_cloud_range, device="cuda").view(1, 6).contiguous()

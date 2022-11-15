@@ -15,20 +15,22 @@ DATA_CONFIG:
         'test': False
       }
 
-    - NAME: transform_points_to_voxels_200  # 转到粗粒度坐标系
-      VOXEL_SIZE: [ 0.352, 0.45454, 0.44 ]
-      MAX_POINTS_PER_VOXEL: 12
-      MAX_NUMBER_OF_VOXELS: {
-        'train': 20000,
-        'test': 40000
-      }
-      NUM_POINT_FEATURES: 4
-
-    - NAME: det_transform_points_to_voxels  # 点云转原始voxel
+#    第一阶段center
+    - NAME: center_transform_points_to_voxels  # 点云转原始voxel
       VOXEL_SIZE: [ 0.05, 0.05, 0.1 ]
       MAX_POINTS_PER_VOXEL: 5
       MAX_NUMBER_OF_VOXELS: {
         'train': 16000,
+        'test': 40000
+      }
+      NUM_POINT_FEATURES: 4
+
+#    第一阶段occ
+    - NAME: occ_transform_points_to_voxels  # 转到粗粒度坐标系
+      VOXEL_SIZE: [ 0.352, 0.45454, 0.44 ]
+      MAX_POINTS_PER_VOXEL: 12
+      MAX_NUMBER_OF_VOXELS: {
+        'train': 20000,
         'test': 40000
       }
       NUM_POINT_FEATURES: 4
@@ -67,83 +69,114 @@ DATA_CONFIG:
         WORLD_ROT_ANGLE: [ -0.78539816, 0.78539816 ]
         SAVE_PRE_ROT: True
 
+  OCC:
+    VOXEL_SIZE: [ 0.352, 0.45454, 0.44 ]
+    POINT_CLOUD_RANGE: [ 0, -40, -3, 70.4, 40, 1 ]
+    EMPT_SUR_THRESH: 1
+    BOX_WEIGHT: 0.2
+    RES_NUM_DIM: 3
+    DIST_KERN: [ 5, 9, 5 ]
+
 MODEL:
     NAME: Btc_Center_Onestage
 
-    VFE:
+    OCC:
+      PARAMS:
+        OCC_THRESH: 0.3
+        EVAL_OCC_THRESH: 0.57
+        MAX_NUM_OCC_PNTS: 2048
+        EVAL_MAX_NUM_OCC_PNTS: 40000
+        CLASS_AGNOSTIC: True
+        REG: True
+        PERCENTAGE: 1.1
+
+
+      TARGETS:
+        NAME: OccTargets3D
+        TMPLT: True
+
+      VFE:
         NAME: MeanVFE
 
-    BACKBONE_3D:
-        NAME: VoxelResBackBone8x
+      BACKBONE_3D:
+        STRIDE: 1
+        NAME: VoxelBackBoneDeconv
 
-    MAP_TO_BEV:
-        NAME: HeightCompression
-        NUM_BEV_FEATURES: 256
+      OCC_DENSE_HEAD:
+        NAME: OccHead3D
+        CLASS_AGNOSTIC: True
 
-    BACKBONE_2D:
-        NAME: BaseBEVBackbone
-        LAYER_NUMS: [5]  # 有一个block，里面有5个隐藏层
-        LAYER_STRIDES: [1]  # block里每个隐藏层的步长
-        NUM_FILTERS: [128]  # 每个隐藏层的卷积核数
-        UPSAMPLE_STRIDES: [2]  # 上采样步长
-        NUM_UPSAMPLE_FILTERS: [256]  # 上采样卷积核个数
+        LOSS_CONFIG:
+          CLS_LOSS_TYPE: softmax
+          LOSS_WEIGHTS: {
+            'occ_fore_cls_weight': 1.0,
+            'occ_mirr_cls_weight': 1.0,
+            'occ_bm_cls_weight': 1.0,
+            'occ_neg_cls_weight': 1.0,
 
-    DENSE_HEAD:
-      NAME: CenterHead
-      CLASS_AGNOSTIC: False
+            'occ_fore_res_weight': 0.1,
+            'occ_mirr_res_weight': 0.0,
+            'occ_bm_res_weight': 0.0,
 
-      CLASS_NAMES_EACH_HEAD: [
-        [ 'Car' ]
-      ]
+            'res_beta': 0.025,
+            'cls_alpha': 0.5,
+            'fore_dropout_cls_weight': 1.0,
+            'fore_dropout_reg_weight': 1.0,
+          }
 
-      SHARED_CONV_CHANNEL: 64
-      USE_BIAS_BEFORE_NORM: True
-      NUM_HM_CONV: 2 #  heatmap
-      SEPARATE_HEAD_CFG:
-#        HEAD_ORDER: [ 'center', 'center_z', 'dim', 'rot' ]
-#        HEAD_DICT: {
-#          'center': { 'out_channels': 2, 'num_conv': 2 }, # offset
-#          'center_z': { 'out_channels': 1, 'num_conv': 2 },
-#          'dim': { 'out_channels': 3, 'num_conv': 2 },
-#          'rot': { 'out_channels': 2, 'num_conv': 2 },
-#        }
-        HEAD_ORDER: [ 'center' ]
-        HEAD_DICT: {
-          'center': { 'out_channels': 2, 'num_conv': 2 } # offset
-        }
+      OCC_PNT_UPDATE:
+        NAME: PassOccVox
+        PASS_GRAD: False
+        VIS:
+          STEP_STRIDE: 1000
+          CLS_LOSS: True
+          OCC_VOX: True
+          BM_VOX_VIEW: True
+          FILTER_VIEW: True
+          FORE_VOX_GT_VIEW: True
 
-      TARGET_ASSIGNER_CONFIG:
-        FEATURE_MAP_STRIDE: 4
-        NUM_MAX_OBJS: 500
-        GAUSSIAN_OVERLAP: 0.1
-        MIN_RADIUS: 2
+          OCC_FORE_VOX_GT_VIEW: True
+          OCC_MIRR_VOX_GT_VIEW: True
+          OCC_BM_VOX_GT_VIEW: True
+          OCC_POS_VOX_GT_VIEW: False
+          OCC_NEG_VOX_GT_VIEW: False
 
-      LOSS_CONFIG:
-        LOSS_WEIGHTS: {
-          'cls_weight': 1.0,
-          'loc_weight': 2.0,
-          'code_weights': [ 1.0, 1.0 ]
-        }
+          BOX_VIEW: False # True
+          PRED_FORE_VIEW: True
+          ADD_PNT_VIEW: True
+          DROP_VOX_VIEW: True
+          OUTPUT_CLOUD: True
 
-      POST_PROCESSING:
-        SCORE_THRESH: 0.1
-        POST_CENTER_LIMIT_RANGE: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
-        MAX_OBJ_PER_SAMPLE: 500
-        GENERATE_CENTERS: True
-        NMS_CONFIG:
-          NMS_TYPE: circle_nms
-          NMS_THRESH: 0.7
-          #                NMS_THRESH: 0.01
-          NMS_PRE_MAXSIZE: 4096
-          NMS_POST_MAXSIZE: 500
+      OCC_POST_PROCESSING:
 
-OPTIMIZATION:
+CENTER_OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
     NUM_EPOCHS: 80
 
     OPTIMIZER: adam_onecycle
     LR: 0.003
     WEIGHT_DECAY: 0.01
+    MOMENTUM: 0.9
+
+    MOMS: [0.95, 0.85]
+    PCT_START: 0.4
+    DIV_FACTOR: 10
+    DECAY_STEP_LIST: [35, 45]
+    LR_DECAY: 0.1
+    LR_CLIP: 0.0000001
+
+    LR_WARMUP: False
+    WARMUP_EPOCH: 1
+
+    GRAD_NORM_CLIP: 10
+
+OCC_OPTIMIZATION:
+    BATCH_SIZE_PER_GPU: 2
+    NUM_EPOCHS: 41
+
+    OPTIMIZER: adam_onecycle
+    LR: 0.003
+    WEIGHT_DECAY: 0.001
     MOMENTUM: 0.9
 
     MOMS: [0.95, 0.85]
