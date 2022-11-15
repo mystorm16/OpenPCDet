@@ -142,9 +142,9 @@ class DataProcessor(object):
             voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
         # draw_scenes(voxels.reshape(-1, 4))
 
-        data_dict['center_voxels'] = voxels
-        data_dict['center_voxel_coords'] = coordinates
-        data_dict['center_voxel_num_points'] = num_points
+        data_dict['det_voxels'] = voxels
+        data_dict['det_voxel_coords'] = coordinates
+        data_dict['det_voxel_num_points'] = num_points
         return data_dict
 
     def transform_points_to_voxels_200(self, data_dict=None, config=None):

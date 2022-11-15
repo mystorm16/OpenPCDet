@@ -125,12 +125,12 @@ def main():
     optimizer_lst = []
     optim_cfg_lst = []
 
-    # occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")
-    # optimizer_lst.append(occ_optimizer)
-    # optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)
+    occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")
+    optimizer_lst.append(occ_optimizer)
+    optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)
 
-    center_optimizer = build_optimizer(model, cfg.OPTIMIZATION, para_lst_name="det")
-    optimizer_lst.append(center_optimizer)
+    det_optimizer = build_optimizer(model, cfg.OPTIMIZATION, para_lst_name="det")
+    optimizer_lst.append(det_optimizer)
     optim_cfg_lst.append(cfg.OPTIMIZATION)
 
     # load checkpoint if it is possible
@@ -156,17 +156,17 @@ def main():
         model = nn.parallel.DistributedDataParallel(model, device_ids=[cfg.LOCAL_RANK % torch.cuda.device_count()])
     logger.info(model)
 
-    # lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
-    #     optimizer_lst, total_iters_each_epoch=len(train_loader),
-    #     total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.OPTIMIZATION.NUM_EPOCHS],
-    #     last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
-    # )
-
     lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
         optimizer_lst, total_iters_each_epoch=len(train_loader),
-        total_epochs_lst=[cfg.OPTIMIZATION.NUM_EPOCHS],
+        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.OPTIMIZATION.NUM_EPOCHS],
         last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
     )
+
+    # lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
+    #     optimizer_lst, total_iters_each_epoch=len(train_loader),
+    #     total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS],
+    #     last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
+    # )
 
     # -----------------------start training---------------------------
     logger.info('**********************Start training %s/%s(%s)**********************'

@@ -3,7 +3,7 @@ CLASS_NAMES: ['Car']
 DATA_CONFIG:
   _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
 
-  DATA_PATH: '../data/kitti/detection3d'  # btc数据库
+  DATA_PATH: '../data/kitti/detection3d'  # btc的数据库
 
   DATA_PROCESSOR:  # 预处理
     - NAME: mask_points_and_boxes_outside_range  # 遮盖所有在点云范围之外的点和gt_box
@@ -68,7 +68,7 @@ DATA_CONFIG:
         SAVE_PRE_ROT: True
 
   OCC:
-    VOXEL_SIZE: [0.32, 0.5184, 0.36]
+    VOXEL_SIZE: [ 0.352, 0.45454, 0.44 ]
     POINT_CLOUD_RANGE: [0, -40, -3, 70.4, 40, 1]
     EMPT_SUR_THRESH: 1
     BOX_WEIGHT: 0.2
@@ -77,59 +77,6 @@ DATA_CONFIG:
 
 MODEL:
     NAME: Btc_Center
-
-#    OCC_CENTER:
-#      VFE:
-#        NAME: PillarVFE
-#        WITH_DISTANCE: False
-#        USE_ABSLOTE_XYZ: True
-#        USE_NORM: True
-#        NUM_FILTERS: [ 64, 64 ]
-#
-#      MAP_TO_BEV:
-#        NAME: PointPillarScatter
-#        NUM_BEV_FEATURES: 64
-#
-#      BACKBONE_2D:
-#          NAME: BaseBEVBackbone
-#          LAYER_NUMS: [ 3, 5, 5 ]
-#          LAYER_STRIDES: [ 1, 2, 2 ]
-#          NUM_FILTERS: [ 64, 128, 256 ]
-#          UPSAMPLE_STRIDES: [ 1, 2, 4 ]
-#          NUM_UPSAMPLE_FILTERS: [ 128, 128, 128 ]
-#
-#      DENSE_HEAD:
-#        NAME: CenterHead
-#        CLASS_AGNOSTIC: False
-#
-#        CLASS_NAMES_EACH_HEAD: [
-#          [ 'Car' ]
-#        ]
-#
-#        SHARED_CONV_CHANNEL: 64
-#        USE_BIAS_BEFORE_NORM: True
-#        NUM_HM_CONV: 2
-#        SEPARATE_HEAD_CFG:
-#          HEAD_ORDER: [ 'center', 'center_z', 'dim', 'rot' ]
-#          HEAD_DICT: {
-#            'center': { 'out_channels': 2, 'num_conv': 2 },
-#            'center_z': { 'out_channels': 1, 'num_conv': 2 },
-#            'dim': { 'out_channels': 3, 'num_conv': 2 },
-#            'rot': { 'out_channels': 2, 'num_conv': 2 },
-#          }
-#
-#        TARGET_ASSIGNER_CONFIG:
-#          FEATURE_MAP_STRIDE: 1
-#          NUM_MAX_OBJS: 500
-#          GAUSSIAN_OVERLAP: 0.1
-#          MIN_RADIUS: 2
-#
-#        LOSS_CONFIG:
-#          LOSS_WEIGHTS: {
-#            'cls_weight': 1.0,
-#            'loc_weight': 2.0,
-#            'code_weights': [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
-#          }
 
     OCC:
       PARAMS:

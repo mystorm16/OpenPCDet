@@ -27,21 +27,12 @@ class Detector3DTemplate(nn.Module):
         self.register_buffer('global_step', torch.LongTensor(1).zero_())
 
         self.module_topology = [
-            'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d',
-            'pfe', 'dense_head',
+            'occ', 'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'occ_pfe', 'occ_point_head', 'pfe',
+            'dense_head', 'point_head', 'roi_head'
         ]
-
-        # self.module_topology = [
-        #     'occ', 'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'occ_pfe',
-        #     'occ_point_head', 'pfe', 'dense_head', 'point_head', 'roi_head'
-        # ]
 
         self.occ_module_topology = [
             'occ_targets', 'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'occ_dense_head', 'occ_pnt_update'
-        ]
-
-        self.occ_center_module_topology = [
-            'pillar_vfe', 'center_map_to_bev_module', 'center_backbone_2d', 'center_dense_head'
         ]
 
         self.voxel_centers = None
@@ -50,7 +41,6 @@ class Detector3DTemplate(nn.Module):
 
         self.occ_modules = nn.Module()
         self.det_modules = nn.Module()
-        self.center_modules = nn.Module()
         self.clamp_max = self.dataset.dataset_cfg.get("CLAMP", None)
         self.occ_dim = self.dataset.occ_dim
         self.print = False
@@ -86,18 +76,15 @@ class Detector3DTemplate(nn.Module):
         model_info_dict = {
             'occ_module_list': [],
             'det_module_list': [],
-            'center_module_list': [],
             'num_rawpoint_features': self.dataset.point_feature_encoder.num_point_features,
             'num_voxel_point_features': self.dataset.point_feature_encoder.num_point_features,
             'num_point_features': self.dataset.point_feature_encoder.num_point_features,
             'det_grid_size': self.dataset.det_grid_size,
-            'center_grid_size': self.dataset.det_grid_size,
             'occ_grid_size': self.dataset.occ_grid_size,
             'point_cloud_range': self.dataset.point_cloud_range,
             'occ_point_cloud_range': self.dataset.occ_point_cloud_range,
             'occ_voxel_size': self.dataset.occ_voxel_size,
             'det_voxel_size': self.dataset.det_voxel_size,
-            'center_voxel_size': self.dataset.det_voxel_size,
         }
 
         for module_name in self.module_topology:
@@ -105,10 +92,12 @@ class Detector3DTemplate(nn.Module):
                 model_info_dict=model_info_dict
             )
             if module_name != "occ":
+                # self.add_module(module_name, module)
                 if module is not None:
-                    self.center_modules.add_module(module_name, module)
+                    self.det_modules.add_module(module_name, module)
+                    if self.print: print("det module:", module_name)
 
-        return model_info_dict['center_module_list']
+        return model_info_dict['occ_module_list'], model_info_dict['det_module_list']
 
     def build_occ(self, model_info_dict):
         if self.model_cfg.get('OCC', None) is None:
@@ -121,19 +110,7 @@ class Detector3DTemplate(nn.Module):
             # self.add_module('occ_%s' % module_name, module)
             if module is not None:
                 self.occ_modules.add_module(module_name, module)
-        return None, model_info_dict
-
-    def build_occ_center(self, model_info_dict):
-        if self.model_cfg.get('OCC_CENTER', None) is None:
-            return None, model_info_dict
-
-        for module_name in self.occ_center_module_topology:
-            module, model_info_dict = getattr(self, 'build_%s' % module_name)(
-                model_info_dict=model_info_dict,
-            )
-
-            if module is not None:
-                self.occ_center_modules.add_module(module_name, module)
+                if self.print: print("occ module:", module_name)
         return None, model_info_dict
 
     def build_occ_targets(self, model_info_dict, occ=True):
@@ -190,9 +167,9 @@ class Detector3DTemplate(nn.Module):
             model_cfg=model_cfg.VFE,
             num_point_features=model_info_dict['num_voxel_point_features'],
             point_cloud_range=model_info_dict['point_cloud_range'],
-            voxel_size=model_info_dict['occ_voxel_size'] if occ else model_info_dict['center_voxel_size'],
+            voxel_size=model_info_dict['occ_voxel_size'] if occ else model_info_dict['det_voxel_size'],
             data_cfg=self.dataset.dataset_cfg,
-            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['center_grid_size'],
+            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['det_grid_size'],
             num_class=self.occ_num_class if occ else self.num_class,
             maxprob=maxprob
         )
@@ -200,7 +177,7 @@ class Detector3DTemplate(nn.Module):
         if occ:
             model_info_dict['occ_module_list'].append(vfe_module)
         else:
-            model_info_dict['center_module_list'].append(vfe_module)
+            model_info_dict['det_module_list'].append(vfe_module)
         return vfe_module, model_info_dict
 
     def build_backbone_3d(self, model_info_dict, occ=False):
@@ -212,8 +189,8 @@ class Detector3DTemplate(nn.Module):
         backbone_3d_module = backbones_3d.__all__[model_cfg.BACKBONE_3D.NAME](
             model_cfg=model_cfg.BACKBONE_3D,
             input_channels=input_channels,
-            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['center_grid_size'],
-            voxel_size=model_info_dict['occ_voxel_size'] if occ else model_info_dict['center_voxel_size'],
+            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['det_grid_size'],
+            voxel_size=model_info_dict['occ_voxel_size'] if occ else model_info_dict['det_voxel_size'],
             point_cloud_range=model_info_dict['point_cloud_range'],
             original_num_rawpoint_features=self.dataset.point_feature_encoder.num_point_features,
         )
@@ -221,7 +198,7 @@ class Detector3DTemplate(nn.Module):
             model_info_dict['occ_module_list'].append(backbone_3d_module)
             model_info_dict['num_occ_3d_features'] = backbone_3d_module.num_point_features
         else:
-            model_info_dict['center_module_list'].append(backbone_3d_module)
+            model_info_dict['det_module_list'].append(backbone_3d_module)
             model_info_dict['num_point_features'] = backbone_3d_module.num_point_features
         return backbone_3d_module, model_info_dict
 
@@ -231,13 +208,13 @@ class Detector3DTemplate(nn.Module):
             return None, model_info_dict
         map_to_bev_module = map_to_bev.__all__[model_cfg.MAP_TO_BEV.NAME](
             model_cfg=model_cfg.MAP_TO_BEV,
-            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['center_grid_size'],
+            grid_size=model_info_dict['occ_grid_size'] if occ else model_info_dict['det_grid_size'],
             occ_dim=self.occ_dim
         )
         if occ:
             model_info_dict['occ_module_list'].append(map_to_bev_module)
         else:
-            model_info_dict['center_module_list'].append(map_to_bev_module)
+            model_info_dict['det_module_list'].append(map_to_bev_module)
         model_info_dict['num_bev_features'] = map_to_bev_module.num_bev_features
         model_info_dict['pre_conv_num_bev_features'] = map_to_bev_module.num_bev_features
         return map_to_bev_module, model_info_dict
@@ -254,7 +231,7 @@ class Detector3DTemplate(nn.Module):
         if occ:
             model_info_dict['occ_module_list'].append(backbone_2d_module)
         else:
-            model_info_dict['center_module_list'].append(backbone_2d_module)
+            model_info_dict['det_module_list'].append(backbone_2d_module)
         model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
         return backbone_2d_module, model_info_dict
 
@@ -321,12 +298,11 @@ class Detector3DTemplate(nn.Module):
             input_channels=model_info_dict['num_bev_features'],
             num_class=self.num_class if not self.model_cfg.DENSE_HEAD.CLASS_AGNOSTIC else 1,
             class_names=self.class_names,
-            grid_size=model_info_dict['center_grid_size'],
+            grid_size=model_info_dict['det_grid_size'],
             point_cloud_range=model_info_dict['point_cloud_range'],
             predict_boxes_when_training=self.model_cfg.get('ROI_HEAD', False),
-            voxel_size=model_info_dict.get('center_voxel_size', False)
         )
-        model_info_dict['center_module_list'].append(dense_head_module)
+        model_info_dict['det_module_list'].append(dense_head_module)
         return dense_head_module, model_info_dict
 
     def build_occ_dense_head(self, model_info_dict, occ=True):

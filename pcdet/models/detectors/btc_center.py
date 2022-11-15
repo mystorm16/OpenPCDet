@@ -1,5 +1,3 @@
-import time
-
 from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_a, draw_scenes_voxel_b, \
     draw_spherical_voxels_index, draw_spherical_voxels_points
 # from tools.visual_utils.visualize_utils import draw_spherical_voxels, draw_scenes
@@ -51,36 +49,24 @@ class Btc_Center(Detector3DTemplate):
         if batch_dict["is_train"]:
             use_occ_prob = prob <= self.percentage
         batch_dict["use_occ_prob"] = use_occ_prob
-
-        # occ阶段网络
         if self.occ_nograd:
             with torch.no_grad():
                 for cur_module in self.occ_module_list:
                     batch_dict = cur_module(batch_dict)
         else:
-            print("**********")
             for cur_module in self.occ_module_list:
-                # start = time.perf_counter()
                 batch_dict = cur_module(batch_dict)
-                # end = time.perf_counter()
-                # dur = end - start
-                # print(dur)
 
         # det阶段网络
-        if self.det_nograd:
-            with torch.no_grad():
-                for cur_module in self.det_module_list:
-                    batch_dict = cur_module(batch_dict)
-        else:
-            # print("**********")
-            for cur_module in self.det_module_list:
-                # draw_scenes(batch_dict['occ_pnts'])
-                # draw_scenes(batch_dict['gt_points_xyz'])
-                # start = time.perf_counter()
-                batch_dict = cur_module(batch_dict)
-                # end = time.perf_counter()
-                # dur = end - start
-                # print(dur)
+        # if self.det_nograd:
+        #     with torch.no_grad():
+        #         for cur_module in self.det_module_list:
+        #             batch_dict = cur_module(batch_dict)
+        # else:
+        #     for cur_module in self.det_module_list:
+        #         # draw_scenes(batch_dict['occ_pnts'])
+        #         # draw_scenes(batch_dict['gt_points_xyz'])
+        #         batch_dict = cur_module(batch_dict)
 
         if not batch_dict["is_train"]:
             self.eval_count += 1
@@ -132,25 +118,25 @@ class Btc_Center(Detector3DTemplate):
             loss += occ_loss_rpn
             # print("loss", loss)
 
-        if hasattr(self.det_modules, 'dense_head'):
-            det_loss_rpn, det_tb_dict = self.det_modules.dense_head.get_loss()
-            det_loss_rcnn, det_tb_dict = self.det_modules.roi_head.get_loss(det_tb_dict)
-            tb_dict.update({
-                'loss_rpn': det_loss_rpn.item(),
-                **det_tb_dict
-            })
-        elif hasattr(self.det_modules, 'occ_point_head'):
-            det_loss_rpn, det_tb_dict = self.det_modules.occ_point_head.get_loss()
-            det_loss_rcnn, det_tb_dict = self.det_modules.roi_head.get_loss(det_tb_dict)
-            tb_dict.update({
-                'loss_rpn': det_loss_rpn.item(),
-                **det_tb_dict
-            })
-            if hasattr(self.det_modules, 'point_head'):
-                det_loss_point, det_tb_dict = self.det_modules.point_head.get_loss(det_tb_dict)
-                tb_dict.update({
-                    **det_tb_dict
-                })
+        # if hasattr(self.det_modules, 'dense_head'):
+        #     det_loss_rpn, det_tb_dict = self.det_modules.dense_head.get_loss()
+        #     det_loss_rcnn, det_tb_dict = self.det_modules.roi_head.get_loss(det_tb_dict)
+        #     tb_dict.update({
+        #         'loss_rpn': det_loss_rpn.item(),
+        #         **det_tb_dict
+        #     })
+        # elif hasattr(self.det_modules, 'occ_point_head'):
+        #     det_loss_rpn, det_tb_dict = self.det_modules.occ_point_head.get_loss()
+        #     det_loss_rcnn, det_tb_dict = self.det_modules.roi_head.get_loss(det_tb_dict)
+        #     tb_dict.update({
+        #         'loss_rpn': det_loss_rpn.item(),
+        #         **det_tb_dict
+        #     })
+        #     if hasattr(self.det_modules, 'point_head'):
+        #         det_loss_point, det_tb_dict = self.det_modules.point_head.get_loss(det_tb_dict)
+        #         tb_dict.update({
+        #             **det_tb_dict
+        #         })
             # print("det loss", det_loss_rcnn)
         # else:
         #     print("SPG only!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
