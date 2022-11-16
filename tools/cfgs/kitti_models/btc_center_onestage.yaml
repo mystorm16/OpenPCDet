@@ -80,6 +80,70 @@ DATA_CONFIG:
 MODEL:
     NAME: Btc_Center_Onestage
 
+    CENTER_AREA:
+      VFE:
+          NAME: MeanVFE
+
+      BACKBONE_3D:
+          NAME: VoxelResBackBone8x
+
+      MAP_TO_BEV:
+          NAME: HeightCompression
+          NUM_BEV_FEATURES: 256
+
+      BACKBONE_2D:
+          NAME: BaseBEVBackbone
+          LAYER_NUMS: [5]  # 有一个block，里面有5个隐藏层
+          LAYER_STRIDES: [1]  # block里每个隐藏层的步长
+          NUM_FILTERS: [128]  # 每个隐藏层的卷积核数
+          UPSAMPLE_STRIDES: [2]  # 上采样步长
+          NUM_UPSAMPLE_FILTERS: [256]  # 上采样卷积核个数
+
+      DENSE_HEAD:
+        NAME: CenterHead
+        CLASS_AGNOSTIC: False
+
+        CLASS_NAMES_EACH_HEAD: [
+          [ 'Car' ]
+        ]
+
+        SHARED_CONV_CHANNEL: 64
+        USE_BIAS_BEFORE_NORM: True
+        NUM_HM_CONV: 2 #  heatmap
+        SEPARATE_HEAD_CFG:
+          HEAD_ORDER: [ 'center' ]
+          HEAD_DICT: {
+            'center': { 'out_channels': 2, 'num_conv': 2 } # offset  TODO:加入center z
+          }
+
+        TARGET_ASSIGNER_CONFIG:
+          FEATURE_MAP_STRIDE: 4
+          NUM_MAX_OBJS: 500
+          GAUSSIAN_OVERLAP: 0.1
+          MIN_RADIUS: 2
+
+        LOSS_CONFIG:
+          LOSS_WEIGHTS: {
+            'cls_weight': 1.0,
+            'loc_weight': 2.0,
+            'code_weights': [ 1.0, 1.0 ]
+          }
+
+        POST_PROCESSING:  # 这部分和一阶段的centerpoint训练没关系
+          SCORE_THRESH: 0.1
+          POST_CENTER_LIMIT_RANGE: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
+          MAX_OBJ_PER_SAMPLE: 500
+          GENERATE_CENTERS: True
+          AREA_TYPE: 'Manhattan'  # Manhattan Euclidean Rectangle
+          CENTERS_RADIUS: 4  # 热图生成区域的半径
+          NMS_CONFIG:
+            NMS_TYPE: circle_nms
+            MIN_RADIUS: 10  # nms半径
+            POST_MAX_SIZE: 40  # nms后最多保留多少物体
+            NMS_PRE_MAXSIZE: 4096
+            NMS_POST_MAXSIZE: 500
+
+
     OCC:
       PARAMS:
         OCC_THRESH: 0.3

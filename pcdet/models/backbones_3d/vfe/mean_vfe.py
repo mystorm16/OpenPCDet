@@ -8,6 +8,7 @@ class MeanVFE(VFETemplate):
     def __init__(self, model_cfg, num_point_features, **kwargs):
         super().__init__(model_cfg=model_cfg)
         self.num_point_features = num_point_features
+        self.vfe_type = kwargs['vfe_type']
 
     def get_output_feature_dim(self):
         return self.num_point_features
@@ -23,10 +24,20 @@ class MeanVFE(VFETemplate):
         Returns:
             vfe_features: (num_voxels, C)
         """
-        voxel_features, voxel_num_points = batch_dict['occ_voxels'], batch_dict['occ_voxel_num_points']
-        points_mean = voxel_features[:, :, :].sum(dim=1, keepdim=False)
-        normalizer = torch.clamp_min(voxel_num_points.view(-1, 1), min=1.0).type_as(voxel_features)
-        points_mean = points_mean / normalizer
-        batch_dict['occ_voxel_features'] = points_mean.contiguous()
-        # draw_scenes(batch_dict['occ_voxel_features'])
+        if self.vfe_type == 'center':
+            voxel_features, voxel_num_points = batch_dict['center_voxels'], batch_dict['center_voxel_num_points']
+            points_mean = voxel_features[:, :, :].sum(dim=1, keepdim=False)
+            normalizer = torch.clamp_min(voxel_num_points.view(-1, 1), min=1.0).type_as(voxel_features)
+            points_mean = points_mean / normalizer
+            batch_dict['center_voxel_features'] = points_mean.contiguous()
+        if self.vfe_type == 'occ':
+            voxel_features, voxel_num_points = batch_dict['occ_voxels'], batch_dict['occ_voxel_num_points']
+            points_mean = voxel_features[:, :, :].sum(dim=1, keepdim=False)
+            normalizer = torch.clamp_min(voxel_num_points.view(-1, 1), min=1.0).type_as(voxel_features)
+            points_mean = points_mean / normalizer
+            batch_dict['occ_voxel_features'] = points_mean.contiguous()
+
+        # draw_scenes(batch_dict['center_voxel_features'])
+        # batch_dict['occ_voxel_features'] = points_mean.contiguous()
+
         return batch_dict
