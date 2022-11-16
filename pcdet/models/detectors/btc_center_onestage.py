@@ -67,10 +67,12 @@ class Btc_Center_Onestage(Detector3DTemplate):
 
     def get_training_loss(self, batch_dict):
         disp_dict = {}
-        tb_dict = {}
-        occ_loss_rpn, loss_rpn = 0, 0
+        """occ loss"""
+        occ_loss_rpn = torch.tensor([0]).cuda()
         if batch_dict.__contains__('center_area'):  # 没检测到center
             occ_loss_rpn, occ_tb_scalar_dict = self.occ_modules.occ_dense_head.get_loss(batch_dict)
+        """rpn loss"""
+        occ_loss_rpn = occ_loss_rpn*20  # occ loss放大10倍
         loss_rpn, tb_dict = self.center_modules.dense_head.get_loss_center()
 
         loss = occ_loss_rpn+loss_rpn

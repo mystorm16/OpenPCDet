@@ -46,6 +46,7 @@ class PassOccVox(AddOccTemplate):
             batch_dict["added_occ_b_ind"] = occ_coords[..., 0]  # batch index
             batch_dict["occ_pnts"] = occ_pnts
             # draw_scenes(batch_dict['added_occ_xyz'].detach())
+
             occ_carte_coords = self.trans_voxel_grid(batch_dict["added_occ_xyz"], occ_coords[..., 0],
                                                      self.center_voxel_size, self.center_grid_size,
                                                      self.point_cloud_range)  # 从原始点云生成COORD

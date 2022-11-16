@@ -44,7 +44,7 @@ class OccHeadTemplate(nn.Module):
         if self.is_softmax:
             self.add_module(
                 'cls_loss_func',
-                loss_utils.SoftmaxFocalClassificationLoss(alpha=1.0, gamma=2.0)
+                loss_utils.SoftmaxFocalClassificationLoss(alpha=1.0, gamma=1.0)
             )
         else:
             self.add_module(

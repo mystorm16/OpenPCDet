@@ -4,7 +4,6 @@ import datetime
 import glob
 import os
 from pathlib import Path
-from test import repeat_eval_ckpt
 
 import torch
 import torch.nn as nn
@@ -15,7 +14,7 @@ from pcdet.datasets import build_dataloader
 from pcdet.models import build_network, model_fn_decorator
 from pcdet.utils import common_utils
 from train_utils.optimization import build_optimizer, build_scheduler, build_schedulers
-from train_utils.train_utils import train_model, train_model_multi_opt
+from train_utils.train_utils import train_model_multi_opt
 
 
 def parse_config():
@@ -73,7 +72,7 @@ def main():
         assert args.batch_size % total_gpus == 0, 'Batch size should match the number of gpus'
         args.batch_size = args.batch_size // total_gpus
 
-    args.epochs = cfg.OPTIMIZATION.NUM_EPOCHS if args.epochs is None else args.epochs
+    args.epochs = cfg.CENTER_OPTIMIZATION.NUM_EPOCHS if args.epochs is None else args.epochs
 
     if args.fix_random_seed:
         common_utils.set_random_seed(666 + cfg.LOCAL_RANK)
@@ -122,16 +121,16 @@ def main():
     model.cuda()
 
     '''构建优化器'''
-    optimizer_lst = []
-    optim_cfg_lst = []
+    optimizer_lst = []  # 优化器列表
+    optim_cfg_lst = []  # 优化器配置列表
 
-    occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")
-    optimizer_lst.append(occ_optimizer)
-    optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)
+    occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")  # 构建occ网络优化器
+    optimizer_lst.append(occ_optimizer)  # 加入优化器列表
+    optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
 
-    center_optimizer = build_optimizer(model, cfg.CENTER_OPTIMIZATION, para_lst_name="center")
-    optimizer_lst.append(center_optimizer)
-    optim_cfg_lst.append(cfg.CENTER_OPTIMIZATION)
+    center_optimizer = build_optimizer(model, cfg.CENTER_OPTIMIZATION, para_lst_name="center")  # 构建center网络优化器
+    optimizer_lst.append(center_optimizer)  # 加入优化器列表
+    optim_cfg_lst.append(cfg.CENTER_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
 
     # load checkpoint if it is possible
     start_epoch = it = 0
@@ -152,13 +151,12 @@ def main():
             last_epoch = start_epoch + 1
 
     model.train()  # before wrap to DistributedDataParallel to support fixed some parameters
-    if dist_train:
-        model = nn.parallel.DistributedDataParallel(model, device_ids=[cfg.LOCAL_RANK % torch.cuda.device_count()])
     logger.info(model)
 
+    # 构建学习率优化器
     lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
         optimizer_lst, total_iters_each_epoch=len(train_loader),
-        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.CENTER_OPTIMIZATION.NUM_EPOCHS],
+        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.CENTER_OPTIMIZATION.NUM_EPOCHS],  # 这里优化器顺序决定优化过程
         last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
     )
 
@@ -197,26 +195,6 @@ def main():
 
     logger.info('**********************End training %s/%s(%s)**********************\n\n\n'
                 % (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
-
-    logger.info('**********************Start evaluation %s/%s(%s)**********************' %
-                (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
-    test_set, test_loader, sampler = build_dataloader(
-        dataset_cfg=cfg.DATA_CONFIG,
-        class_names=cfg.CLASS_NAMES,
-        batch_size=args.batch_size,
-        dist=dist_train, workers=args.workers, logger=logger, training=False
-    )
-    eval_output_dir = output_dir / 'eval' / 'eval_with_train'
-    eval_output_dir.mkdir(parents=True, exist_ok=True)
-    args.start_epoch = max(args.epochs - args.num_epochs_to_eval, 0)  # Only evaluate the last args.num_epochs_to_eval epochs
-
-    repeat_eval_ckpt(
-        model.module if dist_train else model,
-        test_loader, args, eval_output_dir, logger, ckpt_dir,
-        dist_test=dist_train
-    )
-    logger.info('**********************End evaluation %s/%s(%s)**********************' %
-                (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
 
 
 if __name__ == '__main__':
