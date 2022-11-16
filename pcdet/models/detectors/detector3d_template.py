@@ -130,7 +130,7 @@ class Detector3DTemplate(nn.Module):
         return None, model_info_dict
 
     # occ第一阶段网络
-    def build_occ_targets(self, model_info_dict):
+    def build_occ_targets(self, model_info_dict, type=None):
         model_cfg = self.model_cfg.OCC
         if model_cfg.get('TARGETS', None) is None:
             return None, model_info_dict
@@ -147,7 +147,7 @@ class Detector3DTemplate(nn.Module):
         return occ_target_module, model_info_dict
 
     # occ最后阶段网络
-    def build_occ_pnt_update(self, model_info_dict, occ=True):
+    def build_occ_pnt_update(self, model_info_dict, type=None, occ=True):
         model_cfg = self.model_cfg.OCC if occ else self.model_cfg
         if model_cfg.get('OCC_PNT_UPDATE', None) is None:
             return None, model_info_dict
@@ -341,7 +341,7 @@ class Detector3DTemplate(nn.Module):
         model_info_dict['center_module_list'].append(dense_head_module)
         return dense_head_module, model_info_dict
 
-    def build_occ_dense_head(self, model_info_dict, occ=True):
+    def build_occ_dense_head(self, model_info_dict, type=None):
         model_cfg = self.model_cfg.OCC
         if model_cfg.get('OCC_DENSE_HEAD', None) is None:
             return None, model_info_dict
