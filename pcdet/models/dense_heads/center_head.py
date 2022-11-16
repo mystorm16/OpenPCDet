@@ -364,7 +364,9 @@ class CenterHead(nn.Module):
                 K=post_process_cfg.MAX_OBJ_PER_SAMPLE,
                 circle_nms=(post_process_cfg.NMS_CONFIG.NMS_TYPE == 'circle_nms'),
                 score_thresh=post_process_cfg.SCORE_THRESH,
-                post_center_limit_range=post_center_limit_range
+                post_center_limit_range=post_center_limit_range,
+                min_radius=post_process_cfg.NMS_CONFIG.MIN_RADIUS,
+                post_max_size=post_process_cfg.NMS_CONFIG.POST_MAX_SIZE,
             )
 
             for k, final_dict in enumerate(final_pred_center_dicts):
@@ -413,17 +415,6 @@ class CenterHead(nn.Module):
             )
             self.forward_ret_dict['target_dicts'] = target_dict
 
-            # 可视化热力图真值
-            # hm_vis = target_dict['heatmaps'][0][0][0].cpu().numpy()
-            # fig = plt.figure(figsize=(10, 6))
-            # vis_heatmap = sns.heatmap(hm_vis)
-            # vis_heatmap.invert_yaxis()  # y轴翻转
-            # plt.show()
-            # V.draw_scenes(
-            #     points=data_dict['points'][:, 1:], gt_boxes=data_dict['gt_boxes'][0],
-            #     draw_origin=True
-            # )
-
         self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
 
         if not self.training or self.predict_boxes_when_training:  # 在预测center、centerz、dim、rot、hm后预测box 阈值+NMS
@@ -441,50 +432,48 @@ class CenterHead(nn.Module):
             else:
                 data_dict['final_box_dicts'] = pred_dicts
 
+        # center区域生成
         if self.model_cfg.POST_PROCESSING.GENERATE_CENTERS:  # test 时候使用 batch=1
             pred_center_dicts = self.generate_predicted_centers(
                 data_dict['batch_size'], pred_dicts
             )
             data_dict['final_centers_dicts'] = pred_center_dicts
 
+            batch_size = data_dict['batch_size']
+            center_area = []
+            for bs_idx in range(batch_size):
+                cur_center_area = []
+                center_R = self.model_cfg.POST_PROCESSING.CENTERS_RADIUS  # 区域半径
+                hm_center = pred_center_dicts[bs_idx]['pred_centers'][:, :2]
+                for k, y in enumerate(hm_center):  # y是中心
+                    for i in range(int(y[0]) - center_R, int(y[0]) + center_R):  # i、j是搜索区域
+                        for j in range(int(y[1]) - center_R, int(y[1]) + center_R):
+                            if self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Euclidean':
+                                if np.linalg.norm([int(y[0]) - i, int(y[1]) - j]) <= center_R:  # 欧式距离
+                                    for n in range(-3, 2):
+                                        cur_center_area.append([i, j, n/2])
+                            elif self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Manhattan':
+                                if abs(int(y[0]) - i) + abs(int(y[1]) - j) <= center_R:  # 曼哈顿距离
+                                    for n in range(-3, 2):
+                                        cur_center_area.append([i, j, n/2])
+                            else:  # Rectangle
+                                for n in range(-3, 2):
+                                    cur_center_area.append([i, j, n/2])
+                cur_center_area = torch.tensor(cur_center_area).float().cuda()
+                cur_center_area = torch.nn.functional.pad(cur_center_area, (1, 0), 'constant', bs_idx)  # 加入bs_idx
+                center_area.append(cur_center_area)
+                '''可视化center area'''
+                # points = torch.vstack((data_dict['points'][:, 1:], cur_center_area))
+                # points = cur_center_area
+                # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
 
-        # 最终阈值+NMS后锁定的热图结果，从世界系返回200*176的热图系
-        # xs = torch.round((pred_center_dicts[0]['pred_centers'][:, 0] - self.point_cloud_range[0]) / (self.voxel_size[0] * self.feature_map_stride))
-        # xs = torch.clamp(xs, min=0, max=399)
-        # ys = torch.round((pred_center_dicts[0]['pred_centers'][:, 1] - self.point_cloud_range[1]) / (self.voxel_size[1] * self.feature_map_stride))
-        # ys = torch.clamp(ys, min=0, max=351)
+            # 没检测到center
+            for bs in range(batch_size):
+                if center_area[bs].shape[0] == 1:
+                    return data_dict
 
-        # 可视化预测的热图
-        # bev_map = torch.zeros(400, 352)
-        # bev_map[xs.tolist(), ys.tolist()] = 0.5
-        # fig = plt.figure(figsize=(10, 6))
-        # vis_heatmap = sns.heatmap(bev_map.transpose(1, 0))
-        # vis_heatmap.invert_yaxis()  # y轴翻转
-        # plt.show()
-        #
-        # # 可视化原始点云
-        # vis_points = torch.cat(((data_dict['det_voxel_coords'][0][:, 2].unsqueeze(1),
-        #                          data_dict['det_voxel_coords'][0][:, 1].unsqueeze(1),
-        #                          data_dict['det_voxel_coords'][0][:, 0].unsqueeze(1))), dim=1)
-        # V.draw_scenes(vis_points)
-        #
-        # # 原始点云+hm区域
-        # all_vox = torch.zeros(200, 176, 10)
-        # R = 3  # 区域半径
-        # hm_center = torch.cat((xs.unsqueeze(1), ys.unsqueeze(1)), dim=1)
-        # for k, y in enumerate(hm_center):  # y是中心
-        #     for i in range(int(y[0]) - R, int(y[0]) + R):  # i、j是搜索区域
-        #         for j in range(int(y[1]) - R, int(y[1]) + R):
-        #             # 限制搜索区域范围
-        #             if i < 0: i = 0
-        #             if i > 199: i = 199
-        #             if j < 0: j = 0
-        #             if j > 175: j = 175
-        #             if np.linalg.norm([int(y[0]) - i, int(y[1]) - j]) <= R:  # 欧式距离
-        #                 all_vox[i, j, :] = 1
-        #             # if abs(int(y[0]) - i) + abs(int(y[1]) - j) <= R:  # 曼哈顿距离
-        #             #     all_vox[i, j, :] = 1
-        # vis_hm_area = (all_vox == 1).nonzero(as_tuple=False)  # 所有的voxel的坐标
-        # V.draw_scenes(vis_hm_area, draw_origin=True)
-        # V.draw_scenes(torch.vstack((vis_hm_area.cuda(), vis_points)))
+            center_area = torch.cat(center_area, dim=0)
+            data_dict['center_area'] = center_area
+            # V.draw_scenes(center_area[:, 1:])
+
         return data_dict

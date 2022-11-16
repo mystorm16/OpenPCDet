@@ -224,7 +224,8 @@ def decode_bbox_from_heatmap(heatmap, rot_cos, rot_sin, center, center_z, dim,
 
 
 def decode_centers_from_heatmap(heatmap, center, point_cloud_range=None, voxel_size=None, feature_map_stride=None,
-                                K=100, circle_nms=False, score_thresh=None, post_center_limit_range=None):
+                                K=100, circle_nms=False, score_thresh=None, post_center_limit_range=None,
+                                min_radius=100, post_max_size=40):
     batch_size, num_class, _, _ = heatmap.size()
     scores, inds, class_ids, ys, xs = _topk(heatmap, K=K)  # 在heatmap上找值最大的K个位置
 
@@ -254,8 +255,9 @@ def decode_centers_from_heatmap(heatmap, center, point_cloud_range=None, voxel_s
 
         if circle_nms:
             centers = cur_centers
+            scores = cur_scores
             boxes = torch.cat((centers, scores.view(-1, 1)), dim=1)
-            keep = _circle_nms(boxes, min_radius=100, post_max_size=50)
+            keep = _circle_nms(boxes, min_radius=min_radius, post_max_size=post_max_size)
 
             cur_centers = cur_centers[keep]
             cur_scores = cur_scores[keep]

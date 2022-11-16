@@ -67,14 +67,15 @@ class OccTargets3D(OccTargetsTemplate):
                                                                     voxel_features)  # 按体素内的每个点展开
         # draw_scenes_voxel_a(valid_coords_bnznynx)
         # draw_scenes(valid_voxel_features, gt_boxes=batch_dict['gt_boxes'][0])
+        voxelwise_mask = self.get_voxelwise_mask(valid_coords_bnznynx, bs)  # 把原始点云coord转到1*9*157*209的sphere coord
 
-        voxelwise_mask = self.get_voxelwise_mask(valid_coords_bnznynx, bs)  # 把原始点的体素号转到1*9*176*200的occ coord
-        # draw_scenes_voxel_b(voxelwise_mask)
+        # vcc area
         vcc_mask = self.create_predict_area3d(bs, valid_coords_bnznynx)  # 对每个原始coord进行9*5*5的展开  还是sphere coord
-        # draw_scenes_voxel_b(vcc_mask)
-
-        # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
         occ_voxelwise_mask = vcc_mask
+
+        # center area
+        center_area = batch_dict['center_area']
+        occ_voxelwise_mask = self.create_center_area3d(bs, center_area)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
 
         # gt box内的前景点mask
         fore_voxelwise_mask, fore_res_mtrx, mirr_fore_voxelwise_mask, mirr_res_mtrx = self.get_fore_mirr_voxelwise_mask_res(
@@ -134,7 +135,7 @@ class OccTargets3D(OccTargetsTemplate):
                         self.nz, -1)  # gt内的2D 拉长后的形状
                     # draw_scenes_voxel_b(forebox_label)
         # 生成补全后的shape，作为真值监督训练，这里是cls 存在shape的位置是1否则是0
-        batch_dict = self.prepare_cls_loss_map(batch_dict, vcc_mask, voxelwise_mask, occ_voxelwise_mask,
+        batch_dict = self.prepare_cls_loss_map(batch_dict, voxelwise_mask, occ_voxelwise_mask,
                                                fore_voxelwise_mask, mirr_fore_voxelwise_mask, bm_voxelwise_mask,
                                                forebox_label=forebox_label)  # 得到cls weight label
 

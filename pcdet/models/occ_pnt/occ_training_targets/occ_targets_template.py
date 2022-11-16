@@ -428,11 +428,11 @@ class OccTargetsTemplate(nn.Module):
                                                                      dtype=batch_dict['voxels'].dtype)
         return batch_dict
 
-    def prepare_cls_loss_map(self, batch_dict, vcc_mask, voxelwise_mask, occ_voxelwise_mask, fore_voxelwise_mask,
+    def prepare_cls_loss_map(self, batch_dict, voxelwise_mask, occ_voxelwise_mask, fore_voxelwise_mask,
                              mirr_fore_voxelwise_mask, bm_voxelwise_mask, forebox_label=None):
 
         ##### create cls loss mask #####
-        general_cls_loss_mask = vcc_mask & occ_voxelwise_mask  # 这里应该是可能存在遮挡的区域
+        general_cls_loss_mask = occ_voxelwise_mask  # 这里应该是可能存在遮挡的区域
         # draw_scenes_voxel_b(general_cls_loss_mask)
         occ_fore_cls_mask = fore_voxelwise_mask & general_cls_loss_mask  # fore_voxelwise_mask是尚未补全的前景点
         # draw_scenes_voxel_b(fore_voxelwise_mask)
@@ -472,7 +472,6 @@ class OccTargetsTemplate(nn.Module):
             batch_dict["neg_mask"] = neg_mask
 
         batch_dict.update({
-            "vcc_mask": vcc_mask,
             "voxelwise_mask": voxelwise_mask,
             "bm_voxelwise_mask": bm_voxelwise_mask,
             "occ_voxelwise_mask": occ_voxelwise_mask,
@@ -514,27 +513,27 @@ class OccTargetsTemplate(nn.Module):
         point_dist_mask = self.fix_conv_2dzy(bevcount_mask)
         return point_dist_mask
 
-    # def create_predict_area3d(self, batch_size, voxel_coords):
-    #     # vfe_features: (num_voxels, C)
-    #     # voxel_coords: (num_voxels, 4), [batch_idx, z_idx, y_idx, x_idx]
-    #     voxel_one = torch.ones([list(voxel_coords.shape)[0], 1], device=voxel_coords.device, dtype=torch.float32)
-    #     sparse_shape = [self.nz, self.ny, self.nx]
-    #     input_sp_tensor = spconv.SparseConvTensor(
-    #         features=voxel_one,
-    #         indices=voxel_coords.int(),
-    #         spatial_shape=sparse_shape,
-    #         batch_size=batch_size
-    #     )
-    #     indices_map = self.fix_conv_3d(input_sp_tensor).dense().squeeze(1) > 1e-3 # [N, C, Z, H, W]
-    #     N, Z, H, W = list(indices_map.shape)
-    #     # print("N, Z, H, W", N, Z, H, W) # 181 926 190
-    #     indices_map = indices_map.view(N, self.nz, self.ny, self.nx)
-    #     if self.concede_x != 0:
-    #         real_indices_map = torch.zeros_like(indices_map, dtype=indices_map.dtype)
-    #         real_indices_map[:,:,:,self.concede_x:] = indices_map[:,:,:,:-self.concede_x]
-    #         return real_indices_map.to(torch.uint8)
-    #     else:
-    #         return indices_map.to(torch.uint8)
+    def create_center_area3d(self, bs, center_area_points):
+        # voxel_coords = center_area_points.view(-1, 1, 4)  # 18624 1 4
+        # draw_scenes(center_area_points[:, 1:])
+        center_area_coords, center_area_inds = self.point2coords_inrange(center_area_points[:, 1:],
+                                                                         self.point_origin_tensor,
+                                                                         self.point_max_tensor,
+                                                                         self.max_grid_tensor,
+                                                                         self.min_grid_tensor,
+                                                                         self.voxel_size)
+        # draw_scenes_voxel_a(center_area_coords)
+        center_area_coords = torch.cat((center_area_points[center_area_inds][:, 0].unsqueeze(1),
+                                        center_area_coords), dim=1).long()  # N,4
+        # draw_scenes_voxel_a(center_area_coords)
+
+        center_area = torch.zeros([bs, self.nz, self.ny, self.nx], dtype=torch.uint8, device="cuda")  # 1  9 157 209
+        center_area[torch.clamp(center_area_coords[..., 0], min=0, max=bs - 1),
+                 torch.clamp(center_area_coords[..., 3], min=0, max=self.nz - 1),
+                 torch.clamp(center_area_coords[..., 2], min=0, max=self.ny - 1),
+                 torch.clamp(center_area_coords[..., 1], min=0, max=self.nx - 1)] = 1
+        # draw_scenes_voxel_b(center_area)
+        return center_area
 
     # ①对voxel_coords的每个体素进行扩展，扩展为9*5*5
     # ②把扩展后的点云放入【9 157 209】，不空的为1，空的为0

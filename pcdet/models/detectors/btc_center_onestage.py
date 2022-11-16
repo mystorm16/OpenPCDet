@@ -24,10 +24,11 @@ class Btc_Center_Onestage(Detector3DTemplate):
             use_occ_prob = prob <= self.percentage
         batch_dict["use_occ_prob"] = use_occ_prob
 
-        for cur_module in self.occ_module_list:
+        for cur_module in self.center_module_list:
             batch_dict = cur_module(batch_dict)
-        # for cur_module in self.occ_module_list:
-        #     batch_dict = cur_module(batch_dict)
+        if batch_dict.__contains__('center_area'):  # 没检测到center
+            for cur_module in self.occ_module_list:
+                batch_dict = cur_module(batch_dict)
 
         if not batch_dict["is_train"]:
             self.eval_count += 1
@@ -67,8 +68,14 @@ class Btc_Center_Onestage(Detector3DTemplate):
     def get_training_loss(self, batch_dict):
         disp_dict = {}
         tb_dict = {}
-        occ_loss_rpn, occ_tb_scalar_dict = self.occ_modules.occ_dense_head.get_loss(batch_dict)
+        occ_loss_rpn, loss_rpn = 0, 0
+        if batch_dict.__contains__('center_area'):  # 没检测到center
+            occ_loss_rpn, occ_tb_scalar_dict = self.occ_modules.occ_dense_head.get_loss(batch_dict)
+        loss_rpn, tb_dict = self.center_modules.dense_head.get_loss_center()
 
-        loss = occ_loss_rpn
+        loss = occ_loss_rpn+loss_rpn
+
+        tb_dict['loss_rpn'] = loss_rpn
+        tb_dict['occ_loss_rpn'] = occ_loss_rpn
 
         return loss, tb_dict, disp_dict

@@ -131,7 +131,7 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
         if len(cur_lr_lst) > 1:
             disp_dict.update({'loss': loss.item(), 'lr_occ': cur_lr_lst[0], 'lr_center': cur_lr_lst[1]})
         else:
-            disp_dict.update({'loss': loss.item(), 'lr': cur_lr_lst[0]})
+            disp_dict.update({'loss': tb_dict.occ_loss_rpn(), 'lr': cur_lr_lst[0]})
 
         # log to console and tensorboard
         if rank == 0:

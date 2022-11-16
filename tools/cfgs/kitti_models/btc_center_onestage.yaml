@@ -129,8 +129,8 @@ MODEL:
             'code_weights': [ 1.0, 1.0 ]
           }
 
-        POST_PROCESSING:  # 这部分和一阶段的centerpoint训练没关系
-          SCORE_THRESH: 0.1
+        POST_PROCESSING:
+          SCORE_THRESH: 0.1  # 筛质量不好的center
           POST_CENTER_LIMIT_RANGE: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
           MAX_OBJ_PER_SAMPLE: 500
           GENERATE_CENTERS: True
