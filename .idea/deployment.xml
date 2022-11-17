@@ -7,6 +7,17 @@
           <mappings>
             <mapping deploy="/btc_center" local="$PROJECT_DIR$" web="/" />
           </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/build" />
+            <excludedPath local="true" path="$PROJECT_DIR$/ckpt" />
+            <excludedPath local="true" path="$PROJECT_DIR$/data" />
+            <excludedPath local="true" path="$PROJECT_DIR$/docker" />
+            <excludedPath local="true" path="$PROJECT_DIR$/docs" />
+            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath local="true" path="$PROJECT_DIR$/pcdet.egg-info" />
+            <excludedPath local="true" path="$PROJECT_DIR$/sy_add" />
+            <excludedPath local="true" path="$PROJECT_DIR$/pcdet/ops" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>

@@ -464,8 +464,8 @@ class CenterHead(nn.Module):
                 center_area.append(cur_center_area)
                 '''可视化center area'''
                 # points = torch.vstack((data_dict['points'][:, 1:], cur_center_area))
-                # points = cur_center_area
-                # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
+                points = cur_center_area
+                V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
 
             # 没检测到center
             for bs in range(batch_size):

@@ -70,8 +70,8 @@ class OccTargets3D(OccTargetsTemplate):
         voxelwise_mask = self.get_voxelwise_mask(valid_coords_bnznynx, bs)  # 把原始点云coord转到1*9*157*209的sphere coord
 
         # vcc area
-        vcc_mask = self.create_predict_area3d(bs, valid_coords_bnznynx)  # 对每个原始coord进行9*5*5的展开  还是sphere coord
-        occ_voxelwise_mask = vcc_mask
+        # vcc_mask = self.create_predict_area3d(bs, valid_coords_bnznynx)  # 对每个原始coord进行9*5*5的展开  还是sphere coord
+        # occ_voxelwise_mask = vcc_mask
 
         # center area
         center_area = batch_dict['center_area']
@@ -93,13 +93,13 @@ class OccTargets3D(OccTargetsTemplate):
             bm_voxelwise_mask, bm_res_mtrx = self.get_bm_voxelwise_mask_res(batch_dict, bs, gt_boxes_num, gt_boxes)
             bm_voxelwise_mask = bm_voxelwise_mask * (1 - voxelwise_mask) * (1 - mirr_fore_voxelwise_mask)
             # draw_scenes_voxel_b(bm_voxelwise_mask)
-            # bm_res_mtrx是补全点的三维坐标 在回归的时候使用
+            # bm_res_mtrx是补全点的三维偏移量 在回归的时候使用
             bm_res_mtrx = bm_res_mtrx * (1 - voxelwise_mask).unsqueeze(1) * (1 - mirr_fore_voxelwise_mask).unsqueeze(1)
         else:
             bm_voxelwise_mask = torch.zeros_like(voxelwise_mask, dtype=voxelwise_mask.dtype,
                                                  device=voxelwise_mask.device)
 
-        '''forebox_label'''
+        '''forebox_label:gt内的2D点拉长'''
         forebox_label = None
         if self.data_cfg.OCC.BOX_WEIGHT != 1.0:
             bs, max_num_box, box_c = list(gt_boxes.shape)
