@@ -460,10 +460,10 @@ class CenterHead(nn.Module):
                                         cur_center_area.append([i + 0.25, j - 0.25, n / 4])
                                         cur_center_area.append([i - 0.25, j + 0.25, n / 4])
                                         cur_center_area.append([i - 0.25, j - 0.25, n / 4])
-                                        cur_center_area.append([i + 0.3, j + 0.5, n / 4])
-                                        cur_center_area.append([i + 0.5, j - 0.5, n / 4])
-                                        cur_center_area.append([i - 0.5, j + 0.5, n / 4])
-                                        cur_center_area.append([i - 0.5, j - 0.5, n / 4])
+                                        cur_center_area.append([i, j + 0.25, n / 4])
+                                        cur_center_area.append([i, j - 0.25, n / 4])
+                                        cur_center_area.append([i + 0.25, j, n / 4])
+                                        cur_center_area.append([i - 0.25, j, n / 4])
                             else:  # Rectangle
                                 for n in range(-3, 2):
                                     cur_center_area.append([i, j, n/2])
