@@ -75,7 +75,7 @@ class OccTargets3D(OccTargetsTemplate):
 
         # center area
         center_area = batch_dict['center_area']
-        occ_voxelwise_mask = self.create_center_area3d(bs, center_area)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
+        occ_voxelwise_mask = self.create_center_area3d(center_area, batch_dict)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
 
         # gt box内的前景点mask
         fore_voxelwise_mask, fore_res_mtrx, mirr_fore_voxelwise_mask, mirr_res_mtrx = self.get_fore_mirr_voxelwise_mask_res(
@@ -91,7 +91,7 @@ class OccTargets3D(OccTargetsTemplate):
 
         if self.model_cfg.TARGETS.TMPLT:
             bm_voxelwise_mask, bm_res_mtrx = self.get_bm_voxelwise_mask_res(batch_dict, bs, gt_boxes_num, gt_boxes)
-            bm_voxelwise_mask = bm_voxelwise_mask * (1 - voxelwise_mask) * (1 - mirr_fore_voxelwise_mask)
+            bm_voxelwise_mask = bm_voxelwise_mask * (1 - voxelwise_mask) * (1 - mirr_fore_voxelwise_mask)  # 完整形状点云除去原始点和前景对称点
             # draw_scenes_voxel_b(bm_voxelwise_mask)
             # bm_res_mtrx是补全点的三维偏移量 在回归的时候使用
             bm_res_mtrx = bm_res_mtrx * (1 - voxelwise_mask).unsqueeze(1) * (1 - mirr_fore_voxelwise_mask).unsqueeze(1)
@@ -154,7 +154,7 @@ class OccTargets3D(OccTargetsTemplate):
                                                                    bs))[..., 0]
             bm_binds = bm_binds[..., 0][label_array]
             bm_carte_points = bm_carte_points[label_array, :]
-            occ_coords_bm_points = bm_carte_points
+            occ_coords_bm_points = bm_carte_points  # 处理掉一些在gtbox之外的补全点
             if "rot_z" in batch_dict:
                 rot_z = batch_dict["rot_z"][bm_binds]
                 noise_rotation = -rot_z * np.pi / 180

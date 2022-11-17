@@ -513,25 +513,31 @@ class OccTargetsTemplate(nn.Module):
         point_dist_mask = self.fix_conv_2dzy(bevcount_mask)
         return point_dist_mask
 
-    def create_center_area3d(self, bs, center_area_points):
+    def create_center_area3d(self, center_area_points, batch_dict):
         # voxel_coords = center_area_points.view(-1, 1, 4)  # 18624 1 4
         # draw_scenes(center_area_points[:, 1:])
-        center_area_coords, center_area_inds = self.point2coords_inrange(center_area_points[:, 1:],
+        bs = batch_dict["gt_boxes"].shape[0]
+        binds = center_area_points[:, 0].long()
+        if "rot_z" in batch_dict:
+            rot_z = batch_dict["rot_z"][binds]
+            noise_rotation = -rot_z * np.pi / 180
+            center_area_points = common_utils.rotate_points_along_z(center_area_points[:, 1:].unsqueeze(1),
+                                                                      noise_rotation).squeeze(1)
+        center_area_coords, center_area_inds = self.point2coords_inrange(center_area_points,
                                                                          self.point_origin_tensor,
                                                                          self.point_max_tensor,
                                                                          self.max_grid_tensor,
                                                                          self.min_grid_tensor,
                                                                          self.voxel_size)
-        # draw_scenes_voxel_a(center_area_coords)
-        center_area_coords = torch.cat((center_area_points[center_area_inds][:, 0].unsqueeze(1),
-                                        center_area_coords), dim=1).long()  # N,4
+        center_area_coords = torch.cat([binds[center_area_inds].unsqueeze(-1),
+                                        self.xyz2zyx(center_area_coords)], dim=-1)
         # draw_scenes_voxel_a(center_area_coords)
 
         center_area = torch.zeros([bs, self.nz, self.ny, self.nx], dtype=torch.uint8, device="cuda")  # 1  9 157 209
         center_area[torch.clamp(center_area_coords[..., 0], min=0, max=bs - 1),
-                 torch.clamp(center_area_coords[..., 3], min=0, max=self.nz - 1),
+                 torch.clamp(center_area_coords[..., 1], min=0, max=self.nz - 1),
                  torch.clamp(center_area_coords[..., 2], min=0, max=self.ny - 1),
-                 torch.clamp(center_area_coords[..., 1], min=0, max=self.nx - 1)] = 1
+                 torch.clamp(center_area_coords[..., 3], min=0, max=self.nx - 1)] = 1
         # draw_scenes_voxel_b(center_area)
         return center_area
 

@@ -454,8 +454,16 @@ class CenterHead(nn.Module):
                                         cur_center_area.append([i, j, n/2])
                             elif self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Manhattan':
                                 if abs(int(y[0]) - i) + abs(int(y[1]) - j) <= center_R:  # 曼哈顿距离
-                                    for n in range(-3, 2):
-                                        cur_center_area.append([i, j, n/2])
+                                    for n in range(-8, 8):
+                                        cur_center_area.append([i, j, n/4])
+                                        cur_center_area.append([i+0.25, j+0.25, n / 4])
+                                        cur_center_area.append([i + 0.25, j - 0.25, n / 4])
+                                        cur_center_area.append([i - 0.25, j + 0.25, n / 4])
+                                        cur_center_area.append([i - 0.25, j - 0.25, n / 4])
+                                        cur_center_area.append([i + 0.3, j + 0.5, n / 4])
+                                        cur_center_area.append([i + 0.5, j - 0.5, n / 4])
+                                        cur_center_area.append([i - 0.5, j + 0.5, n / 4])
+                                        cur_center_area.append([i - 0.5, j - 0.5, n / 4])
                             else:  # Rectangle
                                 for n in range(-3, 2):
                                     cur_center_area.append([i, j, n/2])
@@ -464,8 +472,8 @@ class CenterHead(nn.Module):
                 center_area.append(cur_center_area)
                 '''可视化center area'''
                 # points = torch.vstack((data_dict['points'][:, 1:], cur_center_area))
-                points = cur_center_area
-                V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
+                # points = cur_center_area
+                # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
 
             # 没检测到center
             for bs in range(batch_size):
