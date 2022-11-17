@@ -543,6 +543,50 @@ class OccTargetsTemplate(nn.Module):
 
     # ①对voxel_coords的每个体素进行扩展，扩展为9*5*5
     # ②把扩展后的点云放入【9 157 209】，不空的为1，空的为0
+    def create_center_vcc(self, center, batch_dict):
+        # voxel_coords = center_area_points.view(-1, 1, 4)  # 18624 1 4
+        # draw_scenes(center_area_points[:, 1:])
+        bs = batch_dict["gt_boxes"].shape[0]
+        binds = center[:, 0].long()
+        if "rot_z" in batch_dict:
+            rot_z = batch_dict["rot_z"][binds]
+            noise_rotation = -rot_z * np.pi / 180
+            center_points = common_utils.rotate_points_along_z(center[:, 1:].unsqueeze(1),
+                                                                      noise_rotation).squeeze(1)
+        center_coords, center_inds = self.point2coords_inrange(center_points,
+                                                                         self.point_origin_tensor,
+                                                                         self.point_max_tensor,
+                                                                         self.max_grid_tensor,
+                                                                         self.min_grid_tensor,
+                                                                         self.voxel_size)
+        center_coords = torch.cat([binds[center_inds].unsqueeze(-1),
+                                        self.xyz2zyx(center_coords)], dim=-1)
+        # draw_scenes_voxel_a(center_coords)
+        voxel_coords = center_coords.view(-1, 1, 4)  # 18624 1 4
+
+        # 开始生成9*5*5的mesh grid
+        nz, ny, nx = 5, 10, 10
+        startz, starty, startx = -(nz // 2), -(ny // 2), -(nx // 2)  # -2 -2 -4
+        startx += self.concede_x  # 0
+        x_ind = torch.arange(startx, startx + nx, device="cuda")  # 0~4
+        y_ind = torch.arange(starty, starty + ny, device="cuda")  # -4~4
+        z_ind = torch.arange(startz, startz + nz, device="cuda")  # -2~2
+        z, y, x = torch.meshgrid(z_ind, y_ind, x_ind)  # 所有点的Z Y X坐标
+        # bzyx：1 255 4 每个mesh grid坐标
+        bzyx = torch.stack([torch.zeros_like(z, device=z.device, dtype=z.dtype), z, y, x], axis=-1).view(1, -1, 4)
+
+        voxel_coords = (voxel_coords + bzyx).view(-1, 4)  # [4629150 4] [bs z y x] 在原来每个原始点云的基础上展开为9*5*5的mesh grid
+
+        # 把扩展mesh后的voxel_coords【N,4】转到【 1 9 157 209】的直角系，若新voxel内含有voxel_coords的voxel就赋1
+        vcc_mask = torch.zeros([bs, self.nz, self.ny, self.nx], dtype=torch.uint8, device="cuda")  # 1  9 157 209
+        vcc_mask[torch.clamp(voxel_coords[..., 0], min=0, max=bs - 1),
+                 torch.clamp(voxel_coords[..., 1], min=0, max=self.nz - 1),
+                 torch.clamp(voxel_coords[..., 2], min=0, max=self.ny - 1),
+                 torch.clamp(voxel_coords[..., 3], min=0, max=self.nx - 1)] = 1
+        return vcc_mask
+
+    # ①对voxel_coords的每个体素进行扩展，扩展为9*5*5
+    # ②把扩展后的点云放入【9 157 209】，不空的为1，空的为0
     def create_predict_area3d(self, bs, voxel_coords):
         voxel_coords = voxel_coords.view(-1, 1, 4)  # 18624 1 4
 

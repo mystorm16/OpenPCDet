@@ -243,12 +243,14 @@ class CenterHead(nn.Module):
             hm_loss = self.hm_loss_func(pred_dict['hm'], target_dicts['heatmaps'][idx])
             hm_loss *= self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['cls_weight']
 
-            target_boxes_centers = target_dicts['target_boxes'][idx][:, :, 0:2]  # 1 500 2
+            target_boxes_centers = target_dicts['target_boxes'][idx][:, :, 0:3]  # 1 500 2
             pred_centers = pred_dict['center']  # 1 2 400 352
+            pred_center_z = pred_dict['center_z']  # 1 1 400 352
+            p_cat = torch.cat((pred_centers,pred_center_z),dim=1)
 
             # center回归loss
             reg_loss = self.reg_loss_func(
-                pred_centers, target_dicts['masks'][idx], target_dicts['inds'][idx], target_boxes_centers
+                p_cat, target_dicts['masks'][idx], target_dicts['inds'][idx], target_boxes_centers
             )
             loc_loss = (reg_loss * reg_loss.new_tensor(self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['code_weights'])).sum()
             loc_loss = loc_loss * self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['loc_weight']
@@ -357,9 +359,10 @@ class CenterHead(nn.Module):
         for idx, pred_dict in enumerate(pred_dicts):
             batch_hm = pred_dict['hm'].sigmoid()  # （预测值）过于发散的数据不好学习，用sigmoid稳定一下
             batch_center = pred_dict['center']
+            batch_center_z = pred_dict['center_z']
 
             final_pred_center_dicts = centernet_utils.decode_centers_from_heatmap(
-                heatmap=batch_hm, center=batch_center, point_cloud_range=self.point_cloud_range,
+                heatmap=batch_hm, center=batch_center, center_z=batch_center_z, point_cloud_range=self.point_cloud_range,
                 voxel_size=self.voxel_size, feature_map_stride=self.feature_map_stride,
                 K=post_process_cfg.MAX_OBJ_PER_SAMPLE,
                 circle_nms=(post_process_cfg.NMS_CONFIG.NMS_TYPE == 'circle_nms'),
@@ -437,45 +440,56 @@ class CenterHead(nn.Module):
             pred_center_dicts = self.generate_predicted_centers(
                 data_dict['batch_size'], pred_dicts
             )
-            data_dict['final_centers_dicts'] = pred_center_dicts
 
             batch_size = data_dict['batch_size']
-            center_area = []
-            for bs_idx in range(batch_size):
-                cur_center_area = []
-                center_R = self.model_cfg.POST_PROCESSING.CENTERS_RADIUS  # 区域半径
-                center_density = self.model_cfg.POST_PROCESSING.CENTERS_DENSITY  # 区域密度
-                hm_center = pred_center_dicts[bs_idx]['pred_centers'][:, :2]
-                for k, y in enumerate(hm_center):  # y是中心
-                    for i in range(-center_R, center_R+1):  # 这里代表搜索区域。i，j表示相对于center的偏移量
-                        for j in range(-center_R, center_R+1):
-                            if self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Euclidean':
-                                if np.linalg.norm([i, j]) <= center_R:  # 欧式距离
-                                    for n in range(-3, 2):
-                                        cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
-                            elif self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Manhattan':
-                                if abs(i) + abs(j) <= center_R:  # 曼哈顿距离
-                                    for n in range(-3, 2):
-                                        cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
-                            else:  # Rectangle
-                                for n in range(-3, 2):
-                                    cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
-                cur_center_area = torch.tensor(cur_center_area).float().cuda()
-                cur_center_area = torch.nn.functional.pad(cur_center_area, (1, 0), 'constant', bs_idx)  # 加入bs_idx
-                center_area.append(cur_center_area)
-                '''可视化center area'''
-                # points = torch.vstack((data_dict['points'][:, 1:4], cur_center_area[:, 1:]))
-                # V.draw_scenes(points, gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
-                # points = cur_center_area
-                # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
-
-            # 没检测到center
             for bs in range(batch_size):
-                if center_area[bs].shape[0] == 1:
+                if pred_center_dicts[bs]['pred_centers'].shape[0] == 0:  # 没检测到center
                     return data_dict
+            data_dict['final_centers_dicts'] = pred_center_dicts  # center存入batch dict
+            pred_centers_list = []
+            for bs_idx in range(batch_size):
+                pred_centers = torch.nn.functional.pad(pred_center_dicts[bs_idx]['pred_centers'],
+                                                          (1, 0), 'constant', bs_idx)  # 加入bs_idx
+                pred_centers_list.append(pred_centers)
+            pred_centers = torch.cat(pred_centers_list, dim=0)
+            data_dict['final_centers'] = pred_centers  # center存入batch dict
 
-            center_area = torch.cat(center_area, dim=0)
-            data_dict['center_area'] = center_area
-            # V.draw_scenes(center_area[:, 1:])
+            # center_area = []
+            # for bs_idx in range(batch_size):
+            #     cur_center_area = []
+            #     center_R = self.model_cfg.POST_PROCESSING.CENTERS_RADIUS  # 区域半径
+            #     center_density = self.model_cfg.POST_PROCESSING.CENTERS_DENSITY  # 区域密度
+            #     hm_center = pred_center_dicts[bs_idx]['pred_centers'][:, :2]
+            #     for k, y in enumerate(hm_center):  # y是中心
+            #         for i in range(-center_R, center_R+1):  # 这里代表搜索区域。i，j表示相对于center的偏移量
+            #             for j in range(-center_R, center_R+1):
+            #                 if self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Euclidean':
+            #                     if np.linalg.norm([i, j]) <= center_R:  # 欧式距离
+            #                         for n in range(-3, 2):
+            #                             cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
+            #                 elif self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Manhattan':
+            #                     if abs(i) + abs(j) <= center_R:  # 曼哈顿距离
+            #                         for n in range(-3, 2):
+            #                             cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
+            #                 else:  # Rectangle
+            #                     for n in range(-3, 2):
+            #                         cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
+            #     cur_center_area = torch.tensor(cur_center_area).float().cuda()
+            #     cur_center_area = torch.nn.functional.pad(cur_center_area, (1, 0), 'constant', bs_idx)  # 加入bs_idx
+            #     center_area.append(cur_center_area)
+            #     '''可视化center area'''
+            #     # points = torch.vstack((data_dict['points'][:, 1:4], cur_center_area[:, 1:]))
+            #     # V.draw_scenes(points, gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
+            #     # points = cur_center_area
+            #     # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
+            #
+            # # 没检测到center
+            # for bs in range(batch_size):
+            #     if center_area[bs].shape[0] == 1:
+            #         return data_dict
+            #
+            # center_area = torch.cat(center_area, dim=0)
+            # data_dict['center_area'] = center_area
+            # # V.draw_scenes(center_area[:, 1:])
 
         return data_dict

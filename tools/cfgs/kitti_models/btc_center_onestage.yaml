@@ -111,9 +111,10 @@ MODEL:
         USE_BIAS_BEFORE_NORM: True
         NUM_HM_CONV: 2 #  heatmap
         SEPARATE_HEAD_CFG:
-          HEAD_ORDER: [ 'center' ]
+          HEAD_ORDER: [ 'center' , 'center_z']
           HEAD_DICT: {
-            'center': { 'out_channels': 2, 'num_conv': 2 } # offset  TODO:加入center z
+            'center': { 'out_channels': 2, 'num_conv': 2 }, # offset
+            'center_z': {'out_channels': 1, 'num_conv': 2}
           }
 
         TARGET_ASSIGNER_CONFIG:
@@ -126,7 +127,7 @@ MODEL:
           LOSS_WEIGHTS: {
             'cls_weight': 1.0,
             'loc_weight': 2.0,
-            'code_weights': [ 1.0, 1.0 ]
+            'code_weights': [ 1.0, 1.0, 1.0 ]
           }
 
         POST_PROCESSING:

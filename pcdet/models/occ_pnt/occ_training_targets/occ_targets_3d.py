@@ -74,8 +74,13 @@ class OccTargets3D(OccTargetsTemplate):
         # occ_voxelwise_mask = vcc_mask
 
         # center area
-        center_area = batch_dict['center_area']
-        occ_voxelwise_mask = self.create_center_area3d(center_area, batch_dict)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
+        # center_area = batch_dict['center_area']
+        # occ_voxelwise_mask = self.create_center_area3d(center_area, batch_dict)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
+
+        # center vcc
+        center = batch_dict['final_centers']
+        occ_voxelwise_mask = self.create_center_vcc(center, batch_dict)  # occ_voxelwise_mask [1 9 176 200] 是信息缺失区域
+
         # draw_scenes_voxel_b(occ_voxelwise_mask)
 
         # gt box内的前景点mask

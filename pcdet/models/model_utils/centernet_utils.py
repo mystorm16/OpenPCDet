@@ -223,25 +223,26 @@ def decode_bbox_from_heatmap(heatmap, rot_cos, rot_sin, center, center_z, dim,
     return ret_pred_dicts  # 输出每个batch的预测结果 例如pred boxes【247， 7】
 
 
-def decode_centers_from_heatmap(heatmap, center, point_cloud_range=None, voxel_size=None, feature_map_stride=None,
+def decode_centers_from_heatmap(heatmap, center, center_z, point_cloud_range=None, voxel_size=None, feature_map_stride=None,
                                 K=100, circle_nms=False, score_thresh=None, post_center_limit_range=None,
                                 min_radius=100, post_max_size=40):
     batch_size, num_class, _, _ = heatmap.size()
     scores, inds, class_ids, ys, xs = _topk(heatmap, K=K)  # 在heatmap上找值最大的K个位置
 
     center = _transpose_and_gather_feat(center, inds).view(batch_size, K, 2)
+    center_z = _transpose_and_gather_feat(center_z, inds).view(batch_size, K, 1)
     xs = xs.view(batch_size, K, 1) + center[:, :, 0:1]  # center代表的是当前热图像素距离中心点的位置
     ys = ys.view(batch_size, K, 1) + center[:, :, 1:2]
     xs = xs * feature_map_stride * voxel_size[0] + point_cloud_range[0]  # 从feature map坐标映射回实际场景坐标
     ys = ys * feature_map_stride * voxel_size[1] + point_cloud_range[1]
-    final_center_preds = torch.cat(([xs, ys]), dim=-1)  # [bs 500 2]
+    final_center_preds = torch.cat(([xs, ys, center_z]), dim=-1)  # [bs 500 2]
     final_scores = scores.view(batch_size, K)
 
     # 从这500个检测结果里滤除一些
     # 1.限制中心点在场景里的一定范围之内 这里其实滤除的不多
     assert post_center_limit_range is not None
-    mask = (final_center_preds[..., :2] >= post_center_limit_range[:2]).all(2)
-    mask &= (final_center_preds[..., :2] <= post_center_limit_range[3:5]).all(2)
+    mask = (final_center_preds[..., :3] >= post_center_limit_range[:3]).all(2)
+    mask &= (final_center_preds[..., :3] <= post_center_limit_range[3:6]).all(2)
 
     # 2.滤除score_thresh过低的点 这里是0.1 这里滤了很多
     if score_thresh is not None:
@@ -254,7 +255,7 @@ def decode_centers_from_heatmap(heatmap, center, point_cloud_range=None, voxel_s
         cur_scores = final_scores[k, cur_mask]
 
         if circle_nms:
-            centers = cur_centers
+            centers = cur_centers[:, :2]
             scores = cur_scores
             boxes = torch.cat((centers, scores.view(-1, 1)), dim=1)
             keep = _circle_nms(boxes, min_radius=min_radius, post_max_size=post_max_size)
