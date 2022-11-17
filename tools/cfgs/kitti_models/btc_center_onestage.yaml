@@ -134,8 +134,9 @@ MODEL:
           POST_CENTER_LIMIT_RANGE: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
           MAX_OBJ_PER_SAMPLE: 500
           GENERATE_CENTERS: True
-          AREA_TYPE: 'Manhattan'  # Manhattan Euclidean Rectangle
-          CENTERS_RADIUS: 4  # 热图生成区域的半径
+          AREA_TYPE: 'Euclidean'  # Manhattan Euclidean Rectangle
+          CENTERS_RADIUS: 8  # 热图生成区域的半径
+          CENTERS_DENSITY: 3  # 值越大越密集
           NMS_CONFIG:
             NMS_TYPE: circle_nms
             MIN_RADIUS: 10  # nms半径

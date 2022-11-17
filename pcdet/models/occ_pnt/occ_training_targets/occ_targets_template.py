@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 # from .vfe_template import VFETemplate
 from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_b, draw_spherical_voxels_4, \
-    draw_spherical_voxels_points, draw_spherical_voxels_index
+    draw_spherical_voxels_points, draw_spherical_voxels_index, draw_scenes_voxel_a
 from ....utils import coords_utils, point_box_utils, common_utils
 from functools import partial
 import spconv

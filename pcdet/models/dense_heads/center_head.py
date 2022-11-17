@@ -444,34 +444,28 @@ class CenterHead(nn.Module):
             for bs_idx in range(batch_size):
                 cur_center_area = []
                 center_R = self.model_cfg.POST_PROCESSING.CENTERS_RADIUS  # 区域半径
+                center_density = self.model_cfg.POST_PROCESSING.CENTERS_DENSITY  # 区域密度
                 hm_center = pred_center_dicts[bs_idx]['pred_centers'][:, :2]
                 for k, y in enumerate(hm_center):  # y是中心
-                    for i in range(int(y[0]) - center_R, int(y[0]) + center_R):  # i、j是搜索区域
-                        for j in range(int(y[1]) - center_R, int(y[1]) + center_R):
+                    for i in range(-center_R, center_R+1):  # 这里代表搜索区域。i，j表示相对于center的偏移量
+                        for j in range(-center_R, center_R+1):
                             if self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Euclidean':
-                                if np.linalg.norm([int(y[0]) - i, int(y[1]) - j]) <= center_R:  # 欧式距离
+                                if np.linalg.norm([i, j]) <= center_R:  # 欧式距离
                                     for n in range(-3, 2):
-                                        cur_center_area.append([i, j, n/2])
+                                        cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
                             elif self.model_cfg.POST_PROCESSING.AREA_TYPE == 'Manhattan':
-                                if abs(int(y[0]) - i) + abs(int(y[1]) - j) <= center_R:  # 曼哈顿距离
-                                    for n in range(-8, 8):
-                                        cur_center_area.append([i, j, n/4])
-                                        cur_center_area.append([i+0.25, j+0.25, n / 4])
-                                        cur_center_area.append([i + 0.25, j - 0.25, n / 4])
-                                        cur_center_area.append([i - 0.25, j + 0.25, n / 4])
-                                        cur_center_area.append([i - 0.25, j - 0.25, n / 4])
-                                        cur_center_area.append([i, j + 0.25, n / 4])
-                                        cur_center_area.append([i, j - 0.25, n / 4])
-                                        cur_center_area.append([i + 0.25, j, n / 4])
-                                        cur_center_area.append([i - 0.25, j, n / 4])
+                                if abs(i) + abs(j) <= center_R:  # 曼哈顿距离
+                                    for n in range(-3, 2):
+                                        cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
                             else:  # Rectangle
                                 for n in range(-3, 2):
-                                    cur_center_area.append([i, j, n/2])
+                                    cur_center_area.append([y[0] + i/center_density, y[1] + j/center_density, n/2])
                 cur_center_area = torch.tensor(cur_center_area).float().cuda()
                 cur_center_area = torch.nn.functional.pad(cur_center_area, (1, 0), 'constant', bs_idx)  # 加入bs_idx
                 center_area.append(cur_center_area)
                 '''可视化center area'''
-                # points = torch.vstack((data_dict['points'][:, 1:], cur_center_area))
+                # points = torch.vstack((data_dict['points'][:, 1:4], cur_center_area[:, 1:]))
+                # V.draw_scenes(points, gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
                 # points = cur_center_area
                 # V.draw_scenes(points[:, 1:], gt_boxes=data_dict['gt_boxes'][bs_idx], draw_origin=True)
 
