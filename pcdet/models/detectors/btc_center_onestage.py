@@ -48,24 +48,12 @@ class Btc_Center_Onestage(Detector3DTemplate):
                 metric_dicts.update(occ_dicts)
             if hasattr(self.model_cfg, 'POST_PROCESSING'):
                 pred_dicts, recall_dicts = self.post_processing(batch_dict)
-                if self.model_cfg.get('OCC',
-                                      None) is not None and self.eval_count % self.model_cfg.OCC.OCC_PNT_UPDATE.VIS.STEP_STRIDE == 0:
-                    pc_dict.update(pred_dicts[bind])
-                elif self.model_cfg.get('OCC', None) is None and self.eval_count % EVL_VIS == 0:
-                    gt_points = self.filter_by_bind(batch_dict["points"][..., 0], bind, batch_dict["points"][..., 1:4])
-                    pc_dict.update(pred_dicts[bind])
-                    pc_dict.update({
-                        "gt_points": gt_points,
-                        "gt_boxes": batch_dict["gt_boxes"][bind, :batch_dict["gt_boxes_num"][bind], ...]
-                    })
                 metric_dicts.update(recall_dicts)
                 # draw_scenes(batch_dict['points'][:, 1:], gt_boxes=batch_dict['gt_boxes'][0],
                 #             ref_boxes=pred_dicts[0]['pred_boxes'])
                 # draw_scenes(batch_dict['voxel_features'], gt_boxes=batch_dict['gt_boxes'][0],
                 #             ref_boxes=pred_dicts[0]['pred_boxes'])
-                return pred_dicts, metric_dicts, tb_dict, pc_dict
-            else:
-                return {'loss': torch.zeros(44)}, metric_dicts, {}, pc_dict
+                return pred_dicts, metric_dicts
 
     def get_training_loss(self, batch_dict):
         disp_dict = {}
@@ -89,3 +77,19 @@ class Btc_Center_Onestage(Detector3DTemplate):
         tb_dict['occ_loss_rpn'] = occ_loss_rpn
 
         return loss, tb_dict, disp_dict
+
+    def post_processing(self, batch_dict):
+        post_process_cfg = self.model_cfg.POST_PROCESSING
+        batch_size = batch_dict['batch_size']
+        final_pred_dict = batch_dict['final_box_dicts']
+        recall_dict = {}
+        for index in range(batch_size):
+            pred_boxes = final_pred_dict[index]['pred_boxes']
+
+            recall_dict = self.generate_recall_record(
+                box_preds=pred_boxes,
+                recall_dict=recall_dict, batch_index=index, data_dict=batch_dict,
+                thresh_list=post_process_cfg.RECALL_THRESH_LIST
+            )
+
+        return final_pred_dict, recall_dict

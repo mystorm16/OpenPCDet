@@ -75,6 +75,7 @@ class DataProcessor(object):
         self.voxel_generator_det = None
         self.voxel_generator_occ = None
         self.voxel_generator_center = None
+        self.voxel_generator = None
 
         for cur_cfg in processor_configs:
             cur_processor = getattr(self, cur_cfg.NAME)(config=cur_cfg)
@@ -210,6 +211,36 @@ class DataProcessor(object):
         data_dict['det_voxels'] = voxels
         data_dict['det_voxel_coords'] = coordinates
         data_dict['det_voxel_num_points'] = num_points
+        return data_dict
+
+    def transform_points_to_voxels(self, data_dict=None, config=None):
+        if data_dict is None:
+            grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
+            self.grid_size = np.round(grid_size).astype(np.int64)
+            self.voxel_size = config.VOXEL_SIZE
+            # just bind the config, we will create the VoxelGeneratorWrapper later,
+            # to avoid pickling issues in multiprocess spawn
+            return partial(self.transform_points_to_voxels, config=config)
+
+        if self.voxel_generator is None:
+            self.voxel_generator = VoxelGeneratorWrapper(
+                vsize_xyz=config.VOXEL_SIZE,
+                coors_range_xyz=self.point_cloud_range,
+                num_point_features=4,
+                max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
+                max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
+            )
+
+        points = data_dict['points']
+        voxel_output = self.voxel_generator.generate(points)
+        voxels, coordinates, num_points = voxel_output
+
+        if not data_dict['use_lead_xyz']:
+            voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
+
+        data_dict['voxels'] = voxels
+        data_dict['voxel_coords'] = coordinates
+        data_dict['voxel_num_points'] = num_points
         return data_dict
 
     def gen_pnt_label(self, data_dict=None, config=None):

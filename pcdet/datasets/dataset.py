@@ -43,9 +43,16 @@ class DatasetTemplate(torch_data.Dataset):
         self.center_voxel_size = getattr(self.data_processor, 'center_voxel_size', None)
         self.occ_grid_size = getattr(self.data_processor, 'occ_grid_size', None)
         self.occ_voxel_size = getattr(self.data_processor, 'occ_voxel_size', None)
+        self.grid_size = getattr(self.data_processor, 'grid_size', None)
+        self.voxel_size = getattr(self.data_processor, 'voxel_size', None)
         self.min_points_in_box = self.dataset_cfg.get("MIN_POINTS_IN_BOX", 0)
         self.total_epochs = 0
         self._merge_all_iters_to_one_epoch = False
+
+        if hasattr(self.data_processor, "depth_downsample_factor"):
+            self.depth_downsample_factor = self.data_processor.depth_downsample_factor
+        else:
+            self.depth_downsample_factor = None
 
     @property
     def mode(self):
@@ -189,9 +196,11 @@ class DatasetTemplate(torch_data.Dataset):
             try:
                 if key in ['occ_voxels', 'occ_voxel_num_points', 'occ_voxel_points_label',
                            'det_voxels', 'det_voxel_num_points',
-                           'center_voxels', 'center_voxel_num_points']:
+                           'center_voxels', 'center_voxel_num_points',
+                           'voxels', 'voxel_num_points']:
                     ret[key] = np.concatenate(val, axis=0)
-                elif key in ['points', 'occ_voxel_coords', 'det_voxel_coords', 'center_voxel_coords', 'bm_points']:
+                elif key in ['points', 'occ_voxel_coords', 'det_voxel_coords', 'center_voxel_coords', 'bm_points',
+                             'voxel_coords']:
                     coors = []
                     for i, coor in enumerate(val):
                         coor_pad = np.pad(coor, ((0, 0), (1, 0)), mode='constant', constant_values=i)

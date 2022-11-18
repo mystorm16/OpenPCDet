@@ -259,6 +259,8 @@ class VoxelResBackBone8x(nn.Module):
             'x_conv3': 64,
             'x_conv4': 128
         }
+        self.vfe_type = kwargs['vfe_type'] if hasattr(kwargs, 'vfe_type') else None
+
 
     def forward(self, batch_dict):
         """
@@ -271,7 +273,10 @@ class VoxelResBackBone8x(nn.Module):
             batch_dict:
                 encoded_spconv_tensor: sparse tensor
         """
-        voxel_features, voxel_coords = batch_dict['center_voxel_features'], batch_dict['center_voxel_coords']
+        if self.vfe_type == 'center':
+            voxel_features, voxel_coords = batch_dict['center_voxel_features'], batch_dict['center_voxel_coords']
+        else:
+            voxel_features, voxel_coords = batch_dict['voxel_features'], batch_dict['voxel_coords']
         batch_size = batch_dict['batch_size']
         input_sp_tensor = spconv.SparseConvTensor(
             features=voxel_features,

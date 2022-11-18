@@ -60,7 +60,7 @@ def eval_one_epoch(cfg, model, dataloader, epoch_id, logger, dist_test=False, sa
     }
 
     if hasattr(cfg.MODEL, "OCC") and hasattr(cfg.MODEL.OCC, "OCC_POST_PROCESSING"):
-        for cur_thresh in range(1,10):
+        for cur_thresh in range(1, 10):
             metric['total_occ_num_box_%.1f' % (cur_thresh*0.1)] = 0
 
     if hasattr(cfg.MODEL, "POST_PROCESSING"):
@@ -89,19 +89,10 @@ def eval_one_epoch(cfg, model, dataloader, epoch_id, logger, dist_test=False, sa
     tb_dict_valid={}
     for i, batch_dict in enumerate(dataloader):
         load_data_to_gpu(batch_dict)
-        #
-        # flops_model = add_flops_counting_methods(model)
-        # flops_model.__batch_counter__ = 1
-        # flops_model.eval()
-        # flops_model.start_flops_count(ost=sys.stdout, verbose=True,
-        #                               ignore_list=[])
-        # macs, params = flops_model.compute_average_flops_cost()
-        # print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
-        # print('{:<30}  {:<8}'.format('Number of parameters: ', params))
 
         with torch.no_grad():
             model.global_step = torch.tensor(i, dtype=torch.int64)
-            pred_dicts, ret_dict, tb_dict, pc_dict = model(batch_dict)
+            pred_dicts, ret_dict = model(batch_dict)
         disp_dict = {}
         if hasattr(cfg.MODEL, "OCC") and hasattr(cfg.MODEL.OCC, "OCC_POST_PROCESSING"):
             get_match_stats(ret_dict, metric)
@@ -115,12 +106,6 @@ def eval_one_epoch(cfg, model, dataloader, epoch_id, logger, dist_test=False, sa
         if cfg.LOCAL_RANK == 0:
             progress_bar.set_postfix(disp_dict)
             progress_bar.update()
-
-            # if bool(pc_dict):
-            #     np.save(str(pc_dir)+'/pc_{}_{}'.format(epoch_id, i), pc_dict)
-            # if bool(tb_dict):
-            #     tb_dict_valid.update(tb_dict)
-        # print("torch.get_num_threads", torch.get_num_threads())
 
     if cfg.LOCAL_RANK == 0:
         progress_bar.close()

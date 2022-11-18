@@ -5,7 +5,7 @@ import tools.visual_utils.open3d_vis_utils as V
 class CenterPoint(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
-        self.module_list = self.build_networks()
+        _, _, _, self.module_list = self.build_networks()
 
     def forward(self, batch_dict):
         for cur_module in self.module_list:
@@ -60,4 +60,4 @@ class CenterPoint(Detector3DTemplate):
                 thresh_list=post_process_cfg.RECALL_THRESH_LIST
             )
 
-        return final_pred_dict, recall_dict
+        return final_pred_dict, recall_dict[0]
