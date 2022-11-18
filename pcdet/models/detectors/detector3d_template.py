@@ -32,7 +32,7 @@ class Detector3DTemplate(nn.Module):
         # ]
 
         self.module_topology = [
-            'center_area', 'occ'
+            'center_area', 'occ', 'center_det'
         ]
 
         self.occ_module_topology = [
@@ -40,6 +40,10 @@ class Detector3DTemplate(nn.Module):
         ]
 
         self.center_area_module_topology = [
+            'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'dense_head'
+        ]
+
+        self.center_det_module_topology = [
             'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'dense_head'
         ]
 
@@ -120,6 +124,18 @@ class Detector3DTemplate(nn.Module):
     # 构建center area子网络
     def build_center_area(self, model_info_dict):
         if self.model_cfg.get('CENTER_AREA', None) is None:
+            return None, model_info_dict
+        for module_name in self.center_area_module_topology:
+            module, model_info_dict = getattr(self, 'build_%s' % module_name)(
+                model_info_dict=model_info_dict, type='center'
+            )
+            if module is not None:
+                self.center_modules.add_module(module_name, module)
+        return None, model_info_dict
+
+    # 构建center det子网络
+    def build_center_det(self, model_info_dict):
+        if self.model_cfg.get('CENTER_DET', None) is None:
             return None, model_info_dict
         for module_name in self.center_area_module_topology:
             module, model_info_dict = getattr(self, 'build_%s' % module_name)(
