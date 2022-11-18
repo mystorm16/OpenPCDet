@@ -256,10 +256,10 @@ class CenterHead(nn.Module):
             loc_loss = loc_loss * self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['loc_weight']
 
             loss += hm_loss + loc_loss
-            tb_dict['hm_loss_head_%d' % idx] = hm_loss.item()
-            tb_dict['loc_loss_head_%d' % idx] = loc_loss.item()
+            tb_dict['center_area_hm_loss_head_%d' % idx] = hm_loss.item()
+            tb_dict['center_area_loc_loss_head_%d' % idx] = loc_loss.item()
 
-        tb_dict['rpn_loss'] = loss.item()
+        tb_dict['center_area_rpn_loss'] = loss.item()
         return loss, tb_dict
 
     def get_loss(self):
@@ -285,10 +285,10 @@ class CenterHead(nn.Module):
             loc_loss = loc_loss * self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['loc_weight']
 
             loss += hm_loss + loc_loss
-            tb_dict['hm_loss_head_%d' % idx] = hm_loss.item()
-            tb_dict['loc_loss_head_%d' % idx] = loc_loss.item()
+            tb_dict['center_det_hm_loss_head_%d' % idx] = hm_loss.item()
+            tb_dict['center_det_loc_loss_head_%d' % idx] = loc_loss.item()
 
-        tb_dict['rpn_loss'] = loss.item()
+        tb_dict['center_det_rpn_loss'] = loss.item()
         return loss, tb_dict
 
     def generate_predicted_boxes(self, batch_size, pred_dicts):

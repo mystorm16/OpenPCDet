@@ -18,7 +18,7 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
         parameter_lst = [model.center_modules, model.occ_modules]
     else:
-        parameter_lst = [model.occ_modules, model.center_modules]
+        parameter_lst = [model]
 
     for cur_it in range(total_it_each_epoch):
         try:
@@ -56,11 +56,16 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
         accumulated_iter += 1
         if len(cur_lr_lst) > 1:
             disp_dict.update({'loss': loss.item(),
-                              'loss_rpn': tb_dict['loss_rpn'].item(),
+                              'loss_center_area': tb_dict['loss_center_area'].item(),
                               'occ_loss_rpn': tb_dict['occ_loss_rpn'].item(),
+                              'loss_center_det': tb_dict['loss_center_det'].item(),
                               'lr_occ': cur_lr_lst[0], 'lr_center': cur_lr_lst[1]})
         else:
-            disp_dict.update({'loss': tb_dict.occ_loss_rpn(), 'lr': cur_lr_lst[0]})
+            disp_dict.update({'loss': loss.item(),
+                              'loss_center_area': tb_dict['loss_center_area'].item(),
+                              'occ_loss_rpn': tb_dict['occ_loss_rpn'].item(),
+                              'loss_center_det': tb_dict['loss_center_det'].item(),
+                              'lr': cur_lr_lst[0]})
 
         # log to console and tensorboard
         if rank == 0:

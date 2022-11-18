@@ -72,7 +72,7 @@ def main():
         assert args.batch_size % total_gpus == 0, 'Batch size should match the number of gpus'
         args.batch_size = args.batch_size // total_gpus
 
-    args.epochs = cfg.CENTER_OPTIMIZATION.NUM_EPOCHS if args.epochs is None else args.epochs
+    args.epochs = cfg.STAGEONE_OPTIMIZATION.NUM_EPOCHS if args.epochs is None else args.epochs
 
     if args.fix_random_seed:
         common_utils.set_random_seed(666 + cfg.LOCAL_RANK)
@@ -124,13 +124,17 @@ def main():
     optimizer_lst = []  # 优化器列表
     optim_cfg_lst = []  # 优化器配置列表
 
-    occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")  # 构建occ网络优化器
-    optimizer_lst.append(occ_optimizer)  # 加入优化器列表
-    optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
+    # occ_optimizer = build_optimizer(model, cfg.OCC_OPTIMIZATION, para_lst_name="occ")  # 构建occ网络优化器
+    # optimizer_lst.append(occ_optimizer)  # 加入优化器列表
+    # optim_cfg_lst.append(cfg.OCC_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
+    #
+    # center_optimizer = build_optimizer(model, cfg.CENTER_OPTIMIZATION, para_lst_name="center")  # 构建center网络优化器
+    # optimizer_lst.append(center_optimizer)  # 加入优化器列表
+    # optim_cfg_lst.append(cfg.CENTER_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
 
-    center_optimizer = build_optimizer(model, cfg.CENTER_OPTIMIZATION, para_lst_name="center")  # 构建center网络优化器
-    optimizer_lst.append(center_optimizer)  # 加入优化器列表
-    optim_cfg_lst.append(cfg.CENTER_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
+    stageone_optimizer = build_optimizer(model, cfg.STAGEONE_OPTIMIZATION)  # 构建center网络优化器
+    optimizer_lst.append(stageone_optimizer)  # 加入优化器列表
+    optim_cfg_lst.append(cfg.STAGEONE_OPTIMIZATION)  # 加入优化器配置列表 注意顺序
 
     # load checkpoint if it is possible
     start_epoch = it = 0
@@ -153,18 +157,19 @@ def main():
     model.train()  # before wrap to DistributedDataParallel to support fixed some parameters
     logger.info(model)
 
-    # 构建学习率优化器
-    lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
-        optimizer_lst, total_iters_each_epoch=len(train_loader),
-        total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.CENTER_OPTIMIZATION.NUM_EPOCHS],  # 这里优化器顺序决定优化过程
-        last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
-    )
-
+    # 构建学习率优化器 multi opt
     # lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
     #     optimizer_lst, total_iters_each_epoch=len(train_loader),
-    #     total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS],
+    #     total_epochs_lst=[cfg.OCC_OPTIMIZATION.NUM_EPOCHS, cfg.CENTER_OPTIMIZATION.NUM_EPOCHS],  # 这里优化器顺序决定优化过程
     #     last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
     # )
+
+    # 构建学习率优化器 single opt
+    lr_scheduler_lst, lr_warmup_scheduler_lst = build_schedulers(
+        optimizer_lst, total_iters_each_epoch=len(train_loader),
+        total_epochs_lst=[cfg.STAGEONE_OPTIMIZATION.NUM_EPOCHS],
+        last_epoch=last_epoch, optim_cfg_lst=optim_cfg_lst
+    )
 
     # -----------------------start training---------------------------
     logger.info('**********************Start training %s/%s(%s)**********************'

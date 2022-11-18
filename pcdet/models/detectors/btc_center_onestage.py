@@ -9,7 +9,7 @@ EVL_VIS = 800
 class Btc_Center_Onestage(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset, full_config=None):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset, full_config=full_config)
-        self.occ_module_list, self.center_module_list = self.build_networks()
+        self.occ_module_list, self.center_module_list, self.center_det_module_list = self.build_networks()
         self.percentage = model_cfg.OCC.PARAMS.PERCENTAGE
 
     def forward(self, batch_dict):
@@ -28,6 +28,8 @@ class Btc_Center_Onestage(Detector3DTemplate):
             batch_dict = cur_module(batch_dict)
         if batch_dict.__contains__('center_area') or batch_dict.__contains__('final_centers'):  # 没检测到center
             for cur_module in self.occ_module_list:
+                batch_dict = cur_module(batch_dict)
+            for cur_module in self.center_det_module_list:
                 batch_dict = cur_module(batch_dict)
 
         if not batch_dict["is_train"]:
@@ -67,17 +69,23 @@ class Btc_Center_Onestage(Detector3DTemplate):
 
     def get_training_loss(self, batch_dict):
         disp_dict = {}
-        """occ loss"""
         occ_loss_rpn = torch.tensor([0]).cuda()
-        if batch_dict.__contains__('center_area') or batch_dict.__contains__('final_centers'):  # 没检测到center
+        loss_center_det = torch.tensor([0]).cuda()
+
+        """occ loss + center det loss"""
+        if batch_dict.__contains__('center_area') or batch_dict.__contains__('final_centers'):  # 检测到了center
             occ_loss_rpn, occ_tb_scalar_dict = self.occ_modules.occ_dense_head.get_loss(batch_dict)
-        """rpn loss"""
-        occ_loss_rpn = occ_loss_rpn*10  # occ loss放大10倍
-        loss_rpn, tb_dict = self.center_modules.dense_head.get_loss_center()
+            occ_loss_rpn = occ_loss_rpn * 10  # occ loss放大10倍
+            loss_center_det, tb_center_det_dict = self.center_det_modules.dense_head.get_loss()
 
-        loss = occ_loss_rpn+loss_rpn
+        """center area loss"""
+        loss_center_area, tb_dict = self.center_modules.dense_head.get_loss_center()
 
-        tb_dict['loss_rpn'] = loss_rpn
+
+        loss = loss_center_area + occ_loss_rpn + loss_center_det
+
+        tb_dict['loss_center_area'] = loss_center_area
+        tb_dict['loss_center_det'] = loss_center_det
         tb_dict['occ_loss_rpn'] = occ_loss_rpn
 
         return loss, tb_dict, disp_dict
