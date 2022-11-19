@@ -146,6 +146,8 @@ class VoxelBackBone8x(nn.Module):
             'x_conv3': 64,
             'x_conv4': 64
         }
+        self.type = kwargs['vfe_type'] if kwargs.__contains__('type') else None
+
 
     def forward(self, batch_dict):
         """
@@ -259,8 +261,7 @@ class VoxelResBackBone8x(nn.Module):
             'x_conv3': 64,
             'x_conv4': 128
         }
-        self.vfe_type = kwargs['vfe_type'] if hasattr(kwargs, 'vfe_type') else None
-
+        self.type = kwargs['type'] if kwargs.__contains__('type') else None
 
     def forward(self, batch_dict):
         """
@@ -273,7 +274,7 @@ class VoxelResBackBone8x(nn.Module):
             batch_dict:
                 encoded_spconv_tensor: sparse tensor
         """
-        if self.vfe_type == 'center':
+        if self.type == 'center':
             voxel_features, voxel_coords = batch_dict['center_voxel_features'], batch_dict['center_voxel_coords']
         else:
             voxel_features, voxel_coords = batch_dict['voxel_features'], batch_dict['voxel_coords']

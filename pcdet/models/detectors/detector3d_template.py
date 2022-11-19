@@ -258,7 +258,7 @@ class Detector3DTemplate(nn.Module):
             model_cfg = self.model_cfg.CENTER_DET
         input_channels = model_info_dict['num_point_features']
 
-        if type == 'center' or type == 'occ':
+        if type == 'center' or type == 'occ' or type == 'center_det':
             if model_cfg.get('BACKBONE_3D', None) is None:
                 return None, model_info_dict
             backbone_3d_module = backbones_3d.__all__[model_cfg.BACKBONE_3D.NAME](
@@ -303,7 +303,7 @@ class Detector3DTemplate(nn.Module):
         elif type == 'center_det':
             model_cfg = self.model_cfg.CENTER_DET
 
-        if type == 'center' or type == 'occ':
+        if type == 'center' or type == 'occ' or type == 'center_det':
             if model_cfg.get('MAP_TO_BEV', None) is None:
                 return None, model_info_dict
             map_to_bev_module = map_to_bev.__all__[model_cfg.MAP_TO_BEV.NAME](
@@ -338,7 +338,7 @@ class Detector3DTemplate(nn.Module):
         elif type == 'center_det':
             model_cfg = self.model_cfg.CENTER_DET
 
-        if type == 'center' or type == 'occ':
+        if type == 'center' or type == 'occ' or type == 'center_det':
             if model_cfg.get('BACKBONE_2D', None) is None:
                 return None, model_info_dict
             backbone_2d_module = backbones_2d.__all__[model_cfg.BACKBONE_2D.NAME](
@@ -422,12 +422,10 @@ class Detector3DTemplate(nn.Module):
     def build_dense_head(self, model_info_dict, type=None):
         if type == 'center':
             model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'occ':
-            model_cfg = self.model_cfg.OCC
         elif type == 'center_det':
             model_cfg = self.model_cfg.CENTER_DET
 
-        if type == 'center' or type == 'occ':
+        if type == 'center' or type == 'center_det':
             if model_cfg.get('DENSE_HEAD', None) is None:
                 return None, model_info_dict
             dense_head_module = dense_heads.__all__[model_cfg.DENSE_HEAD.NAME](

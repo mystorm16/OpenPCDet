@@ -31,13 +31,6 @@ class OccTargetsTemplate(nn.Module):
         self.point_origin_tensor = torch.as_tensor([point_cloud_range[:3]], dtype=torch.float32, device="cuda")
         self.point_max_tensor = torch.as_tensor([point_cloud_range[3:]], dtype=torch.float32, device="cuda")
 
-        self.fix_conv_2dzy = torch.nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
-        self.fix_conv_2dzy.weight.data.fill_(1.0)
-        self.fix_conv_2dzy.requires_grad_(False)
-
-        # self.fix_conv_3d = spconv.SparseSequential(
-        #     block(1, 1, data_cfg.OCC.DIST_KERN, norm_fn=None, stride=1, padding=[dist // 2 for dist in data_cfg.OCC.DIST_KERN], indice_key='spconvfix', conv_type='fixspconv'))
-        # self.fix_conv_3d.requires_grad_(False)
         self.all_voxel_centers = voxel_centers["all_voxel_centers"]
         self.all_voxel_centers_2d = voxel_centers["all_voxel_centers_2d"]
 
@@ -507,11 +500,6 @@ class OccTargetsTemplate(nn.Module):
         # draw_spherical_voxels_4(batch_dict["general_reg_loss_mask"])
         # draw_spherical_voxels_4(batch_dict["general_reg_loss_mask_float"])
         return batch_dict
-
-    def create_predict_area2d(self, bevcount_mask):
-        bevcount_mask = bevcount_mask.to(torch.float32)
-        point_dist_mask = self.fix_conv_2dzy(bevcount_mask)
-        return point_dist_mask
 
     def create_center_area3d(self, center_area_points, batch_dict):
         # voxel_coords = center_area_points.view(-1, 1, 4)  # 18624 1 4

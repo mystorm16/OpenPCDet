@@ -9,7 +9,7 @@ EVL_VIS = 800
 class Btc_Center_Onestage(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset, full_config=None):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset, full_config=full_config)
-        self.occ_module_list, self.center_module_list, self.center_det_module_list = self.build_networks()
+        self.occ_module_list, self.center_module_list, self.center_det_module_list, _ = self.build_networks()
         self.percentage = model_cfg.OCC.PARAMS.PERCENTAGE
 
     def forward(self, batch_dict):
