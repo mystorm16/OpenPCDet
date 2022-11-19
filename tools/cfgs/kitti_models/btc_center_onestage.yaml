@@ -213,7 +213,7 @@ MODEL:
           DROP_VOX_VIEW: True
           OUTPUT_CLOUD: True
 
-      OCC_POST_PROCESSING:
+#      OCC_POST_PROCESSING:
 
     CENTER_DET:
       VFE:
@@ -282,19 +282,19 @@ MODEL:
                   NMS_PRE_MAXSIZE: 4096
                   NMS_POST_MAXSIZE: 500
 
-      POST_PROCESSING:
-          RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
-          SCORE_THRESH: 0.1
-          OUTPUT_RAW_SCORE: False
+    POST_PROCESSING:
+        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+        SCORE_THRESH: 0.1
+        OUTPUT_RAW_SCORE: False
 
-          EVAL_METRIC: kitti
+        EVAL_METRIC: kitti
 
-          NMS_CONFIG:
-              MULTI_CLASSES_NMS: False
-              NMS_TYPE: nms_gpu
-              NMS_THRESH: 0.01
-              NMS_PRE_MAXSIZE: 4096
-              NMS_POST_MAXSIZE: 500
+        NMS_CONFIG:
+            MULTI_CLASSES_NMS: False
+            NMS_TYPE: nms_gpu
+            NMS_THRESH: 0.01
+            NMS_PRE_MAXSIZE: 4096
+            NMS_POST_MAXSIZE: 500
 
 CENTER_OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4

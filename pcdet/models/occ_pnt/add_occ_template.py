@@ -140,6 +140,9 @@ class AddOccTemplate(nn.Module):
             points = torch.stack([coord_center_x, coord_center_y, coord_center_z], dim=-1)
             points = common_utils.rotate_points_along_z(points.unsqueeze(1), noise_rotation).squeeze(1)
             return points
+        else:
+            points = torch.stack([coord_center_x, coord_center_y, coord_center_z], dim=-1)
+            return points
 
 
     def assemble_occ_points(self, occ_pnts, pnt_feat_dim, occ_probs):

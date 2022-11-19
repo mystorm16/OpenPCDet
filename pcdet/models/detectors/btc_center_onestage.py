@@ -32,9 +32,6 @@ class Btc_Center_Onestage(Detector3DTemplate):
             for cur_module in self.center_det_module_list:
                 batch_dict = cur_module(batch_dict)
 
-        if not batch_dict["is_train"]:
-            self.eval_count += 1
-
         if self.training:
             loss, det_tb_dict, disp_dict = self.get_training_loss(batch_dict)
             ret_dict = {
@@ -92,4 +89,4 @@ class Btc_Center_Onestage(Detector3DTemplate):
                 thresh_list=post_process_cfg.RECALL_THRESH_LIST
             )
 
-        return final_pred_dict, recall_dict
+        return final_pred_dict, recall_dict[0]

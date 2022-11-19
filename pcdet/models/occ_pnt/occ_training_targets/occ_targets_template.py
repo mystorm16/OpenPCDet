@@ -541,7 +541,7 @@ class OccTargetsTemplate(nn.Module):
             noise_rotation = -rot_z * np.pi / 180
             center_points = common_utils.rotate_points_along_z(center[:, 1:].unsqueeze(1),
                                                                       noise_rotation).squeeze(1)
-        center_coords, center_inds = self.point2coords_inrange(center_points,
+        center_coords, center_inds = self.point2coords_inrange(center[:, 1:],
                                                                          self.point_origin_tensor,
                                                                          self.point_max_tensor,
                                                                          self.max_grid_tensor,

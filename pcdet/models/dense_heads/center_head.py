@@ -420,7 +420,7 @@ class CenterHead(nn.Module):
 
         self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
 
-        if not self.training or self.predict_boxes_when_training:  # 在预测center、centerz、dim、rot、hm后预测box 阈值+NMS
+        if (not self.training or self.predict_boxes_when_training) and self.model_cfg.POST_PROCESSING.GENERATE_CENTERS!=True :  # 在预测center、centerz、dim、rot、hm后预测box 阈值+NMS
             pred_dicts = self.generate_predicted_boxes(  # 在训练过程中预测box、cls score、label
                 data_dict['batch_size'], pred_dicts
             )
