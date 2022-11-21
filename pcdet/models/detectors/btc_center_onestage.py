@@ -78,6 +78,8 @@ class Btc_Center_Onestage(Detector3DTemplate):
     def post_processing(self, batch_dict):
         post_process_cfg = self.model_cfg.POST_PROCESSING
         batch_size = batch_dict['batch_size']
+        # if not batch_dict.__contains__('final_box_dicts'):
+        #     print(111)
         final_pred_dict = batch_dict['final_box_dicts']
         recall_dict = {}
         for index in range(batch_size):

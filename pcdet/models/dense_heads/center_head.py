@@ -292,7 +292,10 @@ class CenterHead(nn.Module):
         return loss, tb_dict
 
     def generate_predicted_boxes(self, batch_size, pred_dicts):
-        post_process_cfg = self.model_cfg.POST_PROCESSING  # 读取参数
+        if self.training == False:
+            post_process_cfg = self.model_cfg.TEST_POST_PROCESSING  # 读取参数
+        else:
+            post_process_cfg = self.model_cfg.POST_PROCESSING  # 读取参数
         post_center_limit_range = torch.tensor(post_process_cfg.POST_CENTER_LIMIT_RANGE).cuda().float()  # 中心点范围
 
         ret_dict = [{
@@ -420,10 +423,11 @@ class CenterHead(nn.Module):
 
         self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
 
-        if (not self.training or self.predict_boxes_when_training) and self.model_cfg.POST_PROCESSING.GENERATE_CENTERS!=True :  # 在预测center、centerz、dim、rot、hm后预测box 阈值+NMS
-            pred_dicts = self.generate_predicted_boxes(  # 在训练过程中预测box、cls score、label
+        # 生成box，center area不进，center det进
+        if (not self.training or self.predict_boxes_when_training) and self.model_cfg.POST_PROCESSING.GENERATE_CENTERS!=True :
+            pred_dicts = self.generate_predicted_boxes(
                 data_dict['batch_size'], pred_dicts
-            )
+            )  # 在test过程中，这里就出最终结果了
 
             if self.predict_boxes_when_training:
                 rois, roi_scores, roi_labels = self.reorder_rois_for_refining(data_dict['batch_size'],
@@ -435,16 +439,21 @@ class CenterHead(nn.Module):
             else:
                 data_dict['final_box_dicts'] = pred_dicts
 
-        # center区域生成
+        # center区域生成 center area进，center det不进
         if self.model_cfg.POST_PROCESSING.GENERATE_CENTERS:  # test 时候使用 batch=1
             pred_center_dicts = self.generate_predicted_centers(
                 data_dict['batch_size'], pred_dicts
             )
 
             batch_size = data_dict['batch_size']
+            # 没检测到center
             for bs in range(batch_size):
-                if pred_center_dicts[bs]['pred_centers'].shape[0] == 0:  # 没检测到center
+                if pred_center_dicts[bs]['pred_centers'].shape[0] == 0:
+                    data_dict['final_box_dicts'] = [{'pred_boxes': torch.tensor([], device='cuda:0'),
+                                                     'pred_scores': torch.tensor([], device='cuda:0'),
+                                                     'pred_labels': torch.tensor([], device='cuda:0', dtype=torch.int64)}]
                     return data_dict
+
             data_dict['final_centers_dicts'] = pred_center_dicts  # center存入batch dict
             pred_centers_list = []
             for bs_idx in range(batch_size):
