@@ -232,14 +232,14 @@ class DataProcessor(object):
                 max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
             )
 
-        bm_points = data_dict['bm_points']
-        bm_points[:, 2] = -0.8
-        np.random.shuffle(bm_points)
-        bm_points = bm_points[0:1000, :]
-        bm_points = np.pad(bm_points, (0, 1), 'constant')
+        # bm_points = data_dict['bm_points']
+        # bm_points[:, 2] = -0.8
+        # np.random.shuffle(bm_points)
+        # bm_points = bm_points[0:10, :]
+        # bm_points = np.pad(bm_points, (0, 1), 'constant')
 
         points = data_dict['points']
-        points = np.vstack((bm_points, points))
+        # points = np.vstack((bm_points, points))
 
         voxel_output = self.voxel_generator.generate(points)
         voxels, coordinates, num_points = voxel_output
