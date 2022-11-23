@@ -235,11 +235,11 @@ class VoxelRCNNHead(RoIHeadTemplate):
             batch_dict['roi_labels'] = targets_dict['roi_labels']
 
         # 输入trian 128个结果
-        V.draw_scenes(
-            points=batch_dict['points'][:, 1:], gt_boxes=batch_dict['gt_boxes'][0],
-            ref_boxes=batch_dict['rois'][0],
-            draw_origin=True
-        )
+        # V.draw_scenes(
+        #     points=batch_dict['points'][:, 1:], gt_boxes=batch_dict['gt_boxes'][0],
+        #     ref_boxes=batch_dict['rois'][0],
+        #     draw_origin=True
+        # )
 
         # RoI aware pooling
         pooled_features = self.roi_grid_pool(batch_dict)  # (ROI数量, 6x6x6, C)

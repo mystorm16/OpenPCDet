@@ -2,6 +2,7 @@ CLASS_NAMES: ['Car']
 
 DATA_CONFIG:
     _BASE_CONFIG_: cfgs/dataset_configs/kitti_dataset.yaml
+    DATA_PATH: '../data/kitti/detection3d'  # btc数据库
     DATA_AUGMENTOR:
         DISABLE_AUG_LIST: ['placeholder']
         AUG_CONFIG_LIST:
@@ -20,6 +21,12 @@ DATA_CONFIG:
               REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
               LIMIT_WHOLE_SCENE: False
 
+            - NAME: add_multi_best_match
+              CAR_MLT_BM_ROOT: bm_50maxdist_2num_car
+              CYC_MLT_BM_ROOT: bm_5maxdist_2num_Cyclist
+              PED_MLT_BM_ROOT: bm_5maxdist_2num_Pedestrian
+              NUM_POINT_FEATURES: 3
+
             - NAME: random_world_flip
               ALONG_AXIS_LIST: ['x']
 
@@ -28,7 +35,26 @@ DATA_CONFIG:
 
             - NAME: random_world_scaling
               WORLD_SCALE_RANGE: [0.95, 1.05]
-     
+
+    DATA_PROCESSOR:
+        - NAME: mask_points_and_boxes_outside_range
+          REMOVE_OUTSIDE_BOXES: True
+
+        - NAME: shuffle_points
+          SHUFFLE_ENABLED: {
+              'train': True,
+              'test': False
+          }
+
+        - NAME: transform_points_to_voxels
+          VOXEL_SIZE: [ 0.05, 0.05, 0.1 ]
+          MAX_POINTS_PER_VOXEL: 5
+          MAX_NUMBER_OF_VOXELS: {
+              'train': 16000,
+              'test': 40000
+          }
+
+
 MODEL:
     NAME: VoxelRCNN
 
