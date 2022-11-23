@@ -642,9 +642,7 @@ class Detector3DTemplate(nn.Module):
                 roi_labels: (B, num_rois)  1 .. num_classes
                 batch_pred_labels: (B, num_boxes, 1)
         Returns:
-
         """
-
         general_cls_loss_mask = batch_dict['general_cls_loss_mask']
         total = torch.sum(general_cls_loss_mask)
         pos_mask = batch_dict["pos_mask"]
