@@ -196,11 +196,12 @@ class DatasetTemplate(torch_data.Dataset):
             try:
                 if key in ['occ_voxels', 'occ_voxel_num_points', 'occ_voxel_points_label',
                            'det_voxels', 'det_voxel_num_points',
+                           'bm_voxels', 'bm_voxel_num_points',
                            'center_voxels', 'center_voxel_num_points',
                            'voxels', 'voxel_num_points']:
                     ret[key] = np.concatenate(val, axis=0)
                 elif key in ['points', 'occ_voxel_coords', 'det_voxel_coords', 'center_voxel_coords', 'bm_points',
-                             'voxel_coords']:
+                             'bm_voxel_coords', 'voxel_coords']:
                     coors = []
                     for i, coor in enumerate(val):
                         coor_pad = np.pad(coor, ((0, 0), (1, 0)), mode='constant', constant_values=i)
