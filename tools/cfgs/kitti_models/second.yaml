@@ -36,6 +36,25 @@ DATA_CONFIG:
         - NAME: random_world_scaling
           WORLD_SCALE_RANGE: [ 0.95, 1.05 ]
 
+    DATA_PROCESSOR:
+      - NAME: mask_points_and_boxes_outside_range
+        REMOVE_OUTSIDE_BOXES: True
+
+      - NAME: shuffle_points
+        SHUFFLE_ENABLED: {
+          'train': True,
+          'test': False
+        }
+
+      - NAME: transform_points_to_voxels
+        VOXEL_SIZE: [ 0.05, 0.05, 0.1 ]
+        MAX_POINTS_PER_VOXEL: 5
+        MAX_NUMBER_OF_VOXELS: {
+          'train': 20000,
+          'test': 40000
+        }
+
+
 MODEL:
     NAME: SECONDNet
 

@@ -117,7 +117,7 @@ class PillarVFE(VFETemplate):
         mask = torch.unsqueeze(mask, -1).type_as(voxel_features)
         features *= mask
         for pfn in self.pfn_layers:
-            features = pfn(features)
+            features = pfn(features)  # 迷你pointnet 就个mlp
         features = features.squeeze()
         batch_dict['pillar_features'] = features
         return batch_dict

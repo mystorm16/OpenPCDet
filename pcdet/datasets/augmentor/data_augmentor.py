@@ -168,6 +168,23 @@ class DataAugmentor(object):
         # draw_scenes(data_dict['points'])
         return data_dict
 
+    def random_world_translation(self, data_dict=None, config=None):
+        if data_dict is None:
+            return partial(self.random_world_translation, config=config)
+        noise_translate_std = config['NOISE_TRANSLATE_STD']
+        if noise_translate_std == 0:
+            return data_dict
+        gt_boxes, points = data_dict['gt_boxes'], data_dict['points']
+        for cur_axis in config['ALONG_AXIS_LIST']:
+            assert cur_axis in ['x', 'y', 'z']
+            gt_boxes, points = getattr(augmentor_utils, 'random_translation_along_%s' % cur_axis)(
+                gt_boxes, points, noise_translate_std,
+            )
+
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
     def random_world_scaling(self, data_dict=None, config=None):
         if data_dict is None:
             return partial(self.random_world_scaling, config=config)
@@ -179,6 +196,98 @@ class DataAugmentor(object):
         for name, val in zip(special_name_lst, special_points_lst):
             data_dict[name] = val
 
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
+    def random_local_rotation(self, data_dict=None, config=None):
+        """
+        Please check the correctness of it before using.
+        """
+        if data_dict is None:
+            return partial(self.random_local_rotation, config=config)
+        rot_range = config['LOCAL_ROT_ANGLE']
+        if not isinstance(rot_range, list):
+            rot_range = [-rot_range, rot_range]
+        gt_boxes, points = augmentor_utils.local_rotation(
+            data_dict['gt_boxes'], data_dict['points'], rot_range=rot_range
+        )
+
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
+    def random_local_scaling(self, data_dict=None, config=None):
+        """
+        Please check the correctness of it before using.
+        """
+        if data_dict is None:
+            return partial(self.random_local_scaling, config=config)
+        gt_boxes, points = augmentor_utils.local_scaling(
+            data_dict['gt_boxes'], data_dict['points'], config['LOCAL_SCALE_RANGE']
+        )
+
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
+    def random_world_frustum_dropout(self, data_dict=None, config=None):
+        """
+        Please check the correctness of it before using.
+        """
+        if data_dict is None:
+            return partial(self.random_world_frustum_dropout, config=config)
+
+        intensity_range = config['INTENSITY_RANGE']
+        gt_boxes, points = data_dict['gt_boxes'], data_dict['points']
+        for direction in config['DIRECTION']:
+            assert direction in ['top', 'bottom', 'left', 'right']
+            gt_boxes, points = getattr(augmentor_utils, 'global_frustum_dropout_%s' % direction)(
+                gt_boxes, points, intensity_range,
+            )
+
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
+    def random_local_frustum_dropout(self, data_dict=None, config=None):
+        """
+        Please check the correctness of it before using.
+        """
+        if data_dict is None:
+            return partial(self.random_local_frustum_dropout, config=config)
+
+        intensity_range = config['INTENSITY_RANGE']
+        gt_boxes, points = data_dict['gt_boxes'], data_dict['points']
+        for direction in config['DIRECTION']:
+            assert direction in ['top', 'bottom', 'left', 'right']
+            gt_boxes, points = getattr(augmentor_utils, 'local_frustum_dropout_%s' % direction)(
+                gt_boxes, points, intensity_range,
+            )
+
+        data_dict['gt_boxes'] = gt_boxes
+        data_dict['points'] = points
+        return data_dict
+
+    def random_local_pyramid_aug(self, data_dict=None, config=None):
+        """
+        Refer to the paper:
+            SE-SSD: Self-Ensembling Single-Stage Object Detector From Point Cloud
+        """
+        if data_dict is None:
+            return partial(self.random_local_pyramid_aug, config=config)
+
+        gt_boxes, points = data_dict['gt_boxes'], data_dict['points']
+
+        gt_boxes, points, pyramids = augmentor_utils.local_pyramid_dropout(gt_boxes, points, config['DROP_PROB'])
+        gt_boxes, points, pyramids = augmentor_utils.local_pyramid_sparsify(gt_boxes, points,
+                                                                            config['SPARSIFY_PROB'],
+                                                                            config['SPARSIFY_MAX_NUM'],
+                                                                            pyramids)
+        gt_boxes, points = augmentor_utils.local_pyramid_swap(gt_boxes, points,
+                                                                 config['SWAP_PROB'],
+                                                                 config['SWAP_MAX_NUM'],
+                                                                 pyramids)
         data_dict['gt_boxes'] = gt_boxes
         data_dict['points'] = points
         return data_dict

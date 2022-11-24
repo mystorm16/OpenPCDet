@@ -1,10 +1,11 @@
 from .detector3d_template import Detector3DTemplate
-
+from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_a, draw_scenes_voxel_b, \
+    draw_spherical_voxels_index, draw_spherical_voxels_points
 
 class PointPillar(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
-        self.module_list = self.build_networks()
+        _, _, _, self.module_list = self.build_networks()
 
     def forward(self, batch_dict):
         for cur_module in self.module_list:

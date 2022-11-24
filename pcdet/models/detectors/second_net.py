@@ -20,6 +20,8 @@ class SECONDNet(Detector3DTemplate):
             return ret_dict, tb_dict, disp_dict
         else:
             pred_dicts, recall_dicts = self.post_processing(batch_dict)
+            draw_scenes(batch_dict['points'][:, 1:], gt_boxes=batch_dict['gt_boxes'][0],
+                        ref_boxes=pred_dicts[0]['pred_boxes'])
             return pred_dicts, recall_dicts
 
     def get_training_loss(self):

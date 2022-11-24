@@ -55,6 +55,7 @@ DATA_CONFIG:
 
             - NAME: random_world_translation
               WORLD_TRANSLATION_RANGE: [ -0.2, 0.2 ]
+              NOISE_TRANSLATE_STD: 0.5
               ALONG_AXIS_LIST: ['x', 'y', 'z']
 
             - NAME: random_local_translation
@@ -164,7 +165,7 @@ MODEL:
             NMS_POST_MAXSIZE: 500
 
 
-OPTIMIZATION:
+STAGEONE_OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
     NUM_EPOCHS: 80
 
