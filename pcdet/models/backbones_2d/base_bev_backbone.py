@@ -29,7 +29,7 @@ class BaseBEVBackbone(nn.Module):
         self.deblocks = nn.ModuleList()
         for idx in range(num_levels):
             cur_layers = [
-                nn.ZeroPad2d(1),
+                nn.ZeroPad2d(1),  # 图像四周都填充0
                 nn.Conv2d(
                     c_in_list[idx], num_filters[idx], kernel_size=3,
                     stride=layer_strides[idx], padding=0, bias=False
@@ -76,7 +76,12 @@ class BaseBEVBackbone(nn.Module):
                 nn.ReLU(),
             ))
 
-        self.num_bev_features = c_in
+        self.num_bev_features = c_in + 1  # sy add
+
+        self.bev_shape_squeeze = nn.Sequential(nn.ZeroPad2d(1),
+                                               nn.Conv2d(1, 1, kernel_size=(3, 3), stride=(2, 2), bias=False),
+                                               nn.BatchNorm2d(1, eps=0.001, momentum=0.01, affine=True, track_running_stats=True),
+                                               nn.ReLU())
 
     def forward(self, data_dict):
         """
@@ -108,5 +113,8 @@ class BaseBEVBackbone(nn.Module):
             x = self.deblocks[-1](x)
 
         data_dict['spatial_features_2d'] = x
+
+        bev_squeeze_features = self.bev_shape_squeeze(data_dict['bm_spatial_features'])
+        data_dict['spatial_features_2d'] = torch.cat((data_dict['spatial_features_2d'], bev_squeeze_features), dim=1)
 
         return data_dict

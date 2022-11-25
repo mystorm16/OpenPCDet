@@ -66,7 +66,7 @@ class PointPillarScatter(nn.Module):
         batch_dict['bm_spatial_features'] = bm_batch_spatial_features
 
         # 1 64 496 432 + 1 1 496 432 -> 1 65 496 432
-        batch_dict['spatial_features'] = torch.cat((batch_dict['spatial_features'], batch_dict['bm_spatial_features']), dim=1)
+        # batch_dict['spatial_features'] = torch.cat((batch_dict['spatial_features'], batch_dict['bm_spatial_features']), dim=1)
 
         # 可视化bev shape mask
         # vis = bm_batch_spatial_features.reshape(496, 432)
