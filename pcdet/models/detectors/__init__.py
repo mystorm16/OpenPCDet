@@ -1,3 +1,4 @@
+from .Bev_Shape_Pillar import Bev_Shape_Pillar
 from .btc_center import Btc_Center
 from .btc_center_onestage import Btc_Center_Onestage
 from .detector3d_template import Detector3DTemplate

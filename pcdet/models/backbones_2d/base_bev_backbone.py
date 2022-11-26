@@ -33,7 +33,7 @@ class BaseBEVBackbone(nn.Module):
             cur_layers = [
                 nn.ZeroPad2d(1),  # 图像四周都填充0
                 nn.Conv2d(
-                    c_in_list[idx] + 1, num_filters[idx], kernel_size=3,
+                    c_in_list[idx], num_filters[idx], kernel_size=3,  # +1
                     stride=layer_strides[idx], padding=0, bias=False
                 ),
                 nn.BatchNorm2d(num_filters[idx], eps=1e-3, momentum=0.01),
@@ -98,14 +98,14 @@ class BaseBEVBackbone(nn.Module):
         Returns:
         """
         spatial_features = data_dict['spatial_features']
-        bev_squeeze_features = data_dict['bm_spatial_features']
+        # bev_squeeze_features = data_dict['bm_spatial_features']
         ups = []
         ret_dict = {}
         x = spatial_features
         for i in range(len(self.blocks)):
             # bev多层特征融合
-            x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)
-            x = torch.cat((x, x_bev), dim=1)
+            # x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)
+            # x = torch.cat((x, x_bev), dim=1)
             x = self.blocks[i](x)
 
             stride = int(spatial_features.shape[2] / x.shape[2])

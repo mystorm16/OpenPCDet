@@ -1,3 +1,4 @@
+from .Bev_Shape_Head import BevShapeHead
 from .anchor_head_multi import AnchorHeadMulti
 from .anchor_head_single import AnchorHeadSingle
 from .anchor_head_template import AnchorHeadTemplate
@@ -18,7 +19,7 @@ __all__ = {
     'CenterHead': CenterHead,
     'ClsHead': ClsHead, # 自定义网络
     'SymmetryHead': SymmetryHead,
-    'Bev_Shape_Head': Bev_Shape_Head,
+    'BevShapeHead': BevShapeHead,
 }
 
 

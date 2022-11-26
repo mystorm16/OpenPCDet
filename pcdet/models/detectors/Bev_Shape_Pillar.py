@@ -25,7 +25,7 @@ class Bev_Shape_Pillar(Detector3DTemplate):
     def get_training_loss(self):
         disp_dict = {}
 
-        loss_rpn, tb_dict = self.dense_head.get_loss()
+        loss_rpn, tb_dict = self.dense_head.get_loss_center()
         tb_dict = {
             'loss_rpn': loss_rpn.item(),
             **tb_dict
