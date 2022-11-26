@@ -32,6 +32,8 @@ __all__ = {
     'POINTRCNN_symmetry': POINTRCNN_symmetry,
     'Btc_Center': Btc_Center,
     'Btc_Center_Onestage': Btc_Center_Onestage,
+    'Bev_Shape_Pillar': Bev_Shape_Pillar,
+
 }
 
 

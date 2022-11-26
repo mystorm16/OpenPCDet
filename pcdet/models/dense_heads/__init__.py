@@ -17,7 +17,8 @@ __all__ = {
     'AnchorHeadMulti': AnchorHeadMulti,
     'CenterHead': CenterHead,
     'ClsHead': ClsHead, # 自定义网络
-    'SymmetryHead':SymmetryHead,
+    'SymmetryHead': SymmetryHead,
+    'Bev_Shape_Head': Bev_Shape_Head,
 }
 
 
