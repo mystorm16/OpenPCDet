@@ -1,7 +1,9 @@
 import numpy as np
 import torch
 import torch.nn as nn
-
+from matplotlib import pyplot as plt
+import seaborn as sns;
+sns.set()
 
 class BaseBEVBackbone(nn.Module):
     def __init__(self, model_cfg, input_channels):
@@ -31,7 +33,7 @@ class BaseBEVBackbone(nn.Module):
             cur_layers = [
                 nn.ZeroPad2d(1),  # 图像四周都填充0
                 nn.Conv2d(
-                    c_in_list[idx], num_filters[idx], kernel_size=3,
+                    c_in_list[idx] + 1, num_filters[idx], kernel_size=3,
                     stride=layer_strides[idx], padding=0, bias=False
                 ),
                 nn.BatchNorm2d(num_filters[idx], eps=1e-3, momentum=0.01),
@@ -76,12 +78,17 @@ class BaseBEVBackbone(nn.Module):
                 nn.ReLU(),
             ))
 
-        self.num_bev_features = c_in + 1  # sy add
+        self.num_bev_features = c_in  # sy add bev模块处理完毕的输出feature
 
-        self.bev_shape_squeeze = nn.Sequential(nn.ZeroPad2d(1),
-                                               nn.Conv2d(1, 1, kernel_size=(3, 3), stride=(2, 2), bias=False),
-                                               nn.BatchNorm2d(1, eps=0.001, momentum=0.01, affine=True, track_running_stats=True),
-                                               nn.ReLU())
+        # bev多层特征融合
+        self.bev_squeeze_blocks = nn.ModuleList()
+        for idx in [1, 2, 4]:
+            # bev_shape_squeeze = nn.Sequential(nn.MaxPool2d(2))
+            bev_shape_squeeze = nn.Sequential(nn.ZeroPad2d(1),
+                                              nn.Conv2d(1, 1, kernel_size=(3, 3), stride=idx, bias=False),
+                                              nn.BatchNorm2d(1, eps=0.001, momentum=0.01, affine=True, track_running_stats=True),
+                                              nn.ReLU())
+            self.bev_squeeze_blocks.append(bev_shape_squeeze)
 
     def forward(self, data_dict):
         """
@@ -91,10 +98,14 @@ class BaseBEVBackbone(nn.Module):
         Returns:
         """
         spatial_features = data_dict['spatial_features']
+        bev_squeeze_features = data_dict['bm_spatial_features']
         ups = []
         ret_dict = {}
         x = spatial_features
         for i in range(len(self.blocks)):
+            # bev多层特征融合
+            x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)
+            x = torch.cat((x, x_bev), dim=1)
             x = self.blocks[i](x)
 
             stride = int(spatial_features.shape[2] / x.shape[2])
@@ -114,7 +125,13 @@ class BaseBEVBackbone(nn.Module):
 
         data_dict['spatial_features_2d'] = x
 
-        bev_squeeze_features = self.bev_shape_squeeze(data_dict['bm_spatial_features'])
-        data_dict['spatial_features_2d'] = torch.cat((data_dict['spatial_features_2d'], bev_squeeze_features), dim=1)
+        # 特征融合
+        # bev_squeeze_features = self.bev_shape_squeeze(data_dict['bm_spatial_features'])
+        # data_dict['spatial_features_2d'] = torch.cat((data_dict['spatial_features_2d'], bev_squeeze_features), dim=1)
+        # 可视化bev shape mask
+        # vis = bev_squeeze_features.reshape(248, 216)
+        # fig = plt.figure(figsize=(6, 6))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
 
         return data_dict
