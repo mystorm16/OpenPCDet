@@ -197,11 +197,18 @@ class DatasetTemplate(torch_data.Dataset):
                 if key in ['occ_voxels', 'occ_voxel_num_points', 'occ_voxel_points_label',
                            'det_voxels', 'det_voxel_num_points',
                            'bm_voxels', 'bm_voxel_num_points',
+                           'c_bm_voxels', 'c_bm_voxel_num_points',
+                           'p_bm_voxels', 'p_bm_voxel_num_points',
+                           'cy_bm_voxels', 'cy_bm_voxel_num_points',
                            'center_voxels', 'center_voxel_num_points',
                            'voxels', 'voxel_num_points']:
                     ret[key] = np.concatenate(val, axis=0)
-                elif key in ['points', 'occ_voxel_coords', 'det_voxel_coords', 'center_voxel_coords', 'bm_points',
-                             'bm_voxel_coords', 'voxel_coords']:
+                elif key in ['points', 'occ_voxel_coords', 'det_voxel_coords', 'center_voxel_coords',
+                             'bm_points', 'bm_voxel_coords', 'bm_points',
+                             'c_bm_points', 'c_bm_voxel_coords', 'c_bm_points',
+                             'p_bm_points', 'p_bm_voxel_coords', 'p_bm_points',
+                             'cy_bm_points', 'cy_bm_voxel_coords', 'cy_bm_points',
+                             'voxel_coords']:
                     coors = []
                     for i, coor in enumerate(val):
                         coor_pad = np.pad(coor, ((0, 0), (1, 0)), mode='constant', constant_values=i)

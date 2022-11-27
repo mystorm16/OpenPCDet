@@ -236,20 +236,51 @@ class DataProcessor(object):
         # bm_points[:, 2] = -0.8
         # np.random.shuffle(bm_points)
         # bm_points = bm_points[0:5000, :]
-
-        points = data_dict['bm_points']
-        points = np.pad(points, (0, 1), 'constant')
         # points = np.vstack((bm_points, points))
 
+        # 转全部bm_points
+        points = data_dict['bm_points']
+        points = np.pad(points, (0, 1), 'constant')  # 补全反射强度
         voxel_output = self.voxel_generator_bm.generate(points)
         voxels, coordinates, num_points = voxel_output
-
         if not data_dict['use_lead_xyz']:
             voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
-
         data_dict['bm_voxels'] = voxels
         data_dict['bm_voxel_coords'] = coordinates
         data_dict['bm_voxel_num_points'] = num_points
+
+        # 转car_bm_points
+        points = data_dict['c_bm_points']
+        points = np.pad(points, (0, 1), 'constant')  # 补全反射强度
+        voxel_output = self.voxel_generator_bm.generate(points)
+        voxels, coordinates, num_points = voxel_output
+        if not data_dict['use_lead_xyz']:
+            voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
+        data_dict['c_bm_voxels'] = voxels
+        data_dict['c_bm_voxel_coords'] = coordinates
+        data_dict['c_bm_voxel_num_points'] = num_points
+
+        # 转p_bm_points
+        points = data_dict['p_bm_points']
+        points = np.pad(points, (0, 1), 'constant')  # 补全反射强度
+        voxel_output = self.voxel_generator_bm.generate(points)
+        voxels, coordinates, num_points = voxel_output
+        if not data_dict['use_lead_xyz']:
+            voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
+        data_dict['p_bm_voxels'] = voxels
+        data_dict['p_bm_voxel_coords'] = coordinates
+        data_dict['p_bm_voxel_num_points'] = num_points
+
+        # 转cy_bm_points
+        points = data_dict['cy_bm_points']
+        points = np.pad(points, (0, 1), 'constant')  # 补全反射强度
+        voxel_output = self.voxel_generator_bm.generate(points)
+        voxels, coordinates, num_points = voxel_output
+        if not data_dict['use_lead_xyz']:
+            voxels = voxels[..., 3:]  # remove xyz in voxels(N, 3)
+        data_dict['cy_bm_voxels'] = voxels
+        data_dict['cy_bm_voxel_coords'] = coordinates
+        data_dict['cy_bm_voxel_num_points'] = num_points
         return data_dict
 
     def transform_points_to_voxels(self, data_dict=None, config=None):

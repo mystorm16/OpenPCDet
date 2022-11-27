@@ -47,6 +47,9 @@ class MltBestMatchQuerier(object):
 
     def add_gtbox_best_match_points_to_scene(self, data_dict):
         obj_points_list = []
+        p_obj_points_list = []  # 存行人的bm points
+        c_obj_points_list = []  # 存车的bm points
+        cy_obj_points_list = []  # 存自行车的bm points
         aug_boxes_num = data_dict['aug_boxes_image_idx'].shape[0] if 'aug_boxes_image_idx' in data_dict else 0
         gt_boxes_num = data_dict['gt_boxes'].shape[0] - aug_boxes_num
         image_idx = int(data_dict['frame_id'])
@@ -54,8 +57,6 @@ class MltBestMatchQuerier(object):
         for idx in range(gt_boxes_num):
             gt_box = data_dict['gt_boxes'][idx]
             gt_name = data_dict['gt_names'][idx]
-            # print("self.bmatch_infos[gt_names]", self.bmatch_infos[gt_names].keys())
-            # print("gt_names", gt_names, gt_boxes_num, aug_boxes_num, data_dict["gt_boxes_inds"])
             if gt_name in self.class_names:
                 gt_box_id = data_dict["gt_boxes_inds"][idx]
                 file_path = self.mlt_bm_root[gt_name] / "{}_{}.pkl".format(image_idx, gt_box_id)
@@ -66,12 +67,29 @@ class MltBestMatchQuerier(object):
                 gtrotation = point_box_utils.get_yaw_rotation(gt_box[6])
                 obj_points = np.einsum("nj,ij->ni", obj_points, gtrotation) + gt_box[:3]
                 obj_points_list.append(obj_points)
-            # else:
-            #     print("found ", gt_name," skip")
+                # 分类别保存bm points
+                if gt_name == 'Car':
+                    c_obj_points_list.append(obj_points)
+                if gt_name == 'Pedestrian':
+                    p_obj_points_list.append(obj_points)
+                if gt_name== 'Cyclist':
+                    cy_obj_points_list.append(obj_points)
         if "bm_points" in data_dict:
             data_dict['bm_points'].extend(obj_points_list)
         else:
             data_dict['bm_points'] = obj_points_list
+        if "c_bm_points" in data_dict:
+            data_dict['c_bm_points'].extend(c_obj_points_list)
+        else:
+            data_dict['c_bm_points'] = c_obj_points_list
+        if "p_bm_points" in data_dict:
+            data_dict['p_bm_points'].extend(p_obj_points_list)
+        else:
+            data_dict['p_bm_points'] = p_obj_points_list
+        if "cy_bm_points" in data_dict:
+            data_dict['cy_bm_points'].extend(cy_obj_points_list)
+        else:
+            data_dict['cy_bm_points'] = cy_obj_points_list
         return data_dict
 
     def add_sampled_boxes_best_match_points_to_scene(self, data_dict):
@@ -81,6 +99,9 @@ class MltBestMatchQuerier(object):
         aug_box = data_dict['gt_boxes'][-aug_length:]
         aug_box_names = data_dict['gt_names'][-aug_length:]
         obj_points_list = []
+        p_obj_points_list = []  # 存行人的bm points
+        c_obj_points_list = []  # 存车的bm points
+        cy_obj_points_list = []  # 存自行车的bm points
         for ind in range(aug_length):
             gt_box = aug_box[ind]
             gt_name = aug_box_names[ind]
@@ -92,7 +113,17 @@ class MltBestMatchQuerier(object):
             gtrotation = point_box_utils.get_yaw_rotation(gt_box[6])
             obj_points = np.einsum("nj,ij->ni", obj_points, gtrotation) + gt_box[:3]
             obj_points_list.append(obj_points)
+            # 分类别保存bm points
+            if gt_name == 'Car':
+                c_obj_points_list.append(obj_points)
+            if gt_name == 'Pedestrian':
+                p_obj_points_list.append(obj_points)
+            if gt_name == 'Cyclist':
+                cy_obj_points_list.append(obj_points)
         data_dict['bm_points'].extend(obj_points_list)
+        data_dict['c_bm_points'].extend(c_obj_points_list)
+        data_dict['p_bm_points'].extend(p_obj_points_list)
+        data_dict['cy_bm_points'].extend(cy_obj_points_list)
         return data_dict
 
 
@@ -289,6 +320,8 @@ class MltBestMatchQuerier(object):
         if self.querier_cfg.get("ABLATION", None) is not None and len(data_dict['bm_points']) > 0:
             data_dict = self.filter_bm(data_dict)
         data_dict['bm_points'] = self.combine_lst(data_dict['bm_points'])
-        # print(data_dict['bm_points'].shape)
+        data_dict['c_bm_points'] = self.combine_lst(data_dict['c_bm_points'])
+        data_dict['p_bm_points'] = self.combine_lst(data_dict['p_bm_points'])
+        data_dict['cy_bm_points'] = self.combine_lst(data_dict['cy_bm_points'])
 
         return data_dict

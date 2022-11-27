@@ -5,6 +5,7 @@ import numpy as np
 from tools.visual_utils.open3d_vis_utils import draw_scenes
 from ...utils import common_utils
 from . import augmentor_utils, database_sampler, best_match_querier, multi_best_match_querier, sup_gt_sampling
+from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_spherical_voxels_points, draw_spherical_voxels_index
 
 SPECIAL_NAMES = ["bm_points", "miss_points", "self_points", "other_points", "miss_occ_points", "self_occ_points",
                  "other_occ_points", "self_limit_occ_mask", "miss_full_occ_points", "other_full_occ_points"]
