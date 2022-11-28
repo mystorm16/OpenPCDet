@@ -45,6 +45,7 @@ def gaussian2D(shape, sigma=1):
 
 
 def draw_gaussian_to_heatmap(heatmap, center, radius, k=1, valid_mask=None):
+    radius = int(radius)
     diameter = 2 * radius + 1
     gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
 

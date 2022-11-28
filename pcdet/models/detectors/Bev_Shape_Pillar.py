@@ -1,3 +1,5 @@
+import time
+
 from .detector3d_template import Detector3DTemplate
 from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_a, draw_scenes_voxel_b, \
     draw_spherical_voxels_index, draw_spherical_voxels_points
@@ -25,11 +27,11 @@ class Bev_Shape_Pillar(Detector3DTemplate):
     def get_training_loss(self):
         disp_dict = {}
 
-        loss_rpn, tb_dict = self.dense_head.get_loss_center()
+        loss_bev_shape, tb_dict = self.dense_head.get_loss_bev_shape()
         tb_dict = {
-            'loss_rpn': loss_rpn.item(),
+            'loss_bev_shape': loss_bev_shape.item(),
             **tb_dict
         }
 
-        loss = loss_rpn
+        loss = loss_bev_shape
         return loss, tb_dict, disp_dict

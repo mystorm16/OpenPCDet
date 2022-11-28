@@ -1,4 +1,7 @@
 import copy
+import time
+from numba import jit
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,10 +10,11 @@ from ..model_utils import model_nms_utils
 from ..model_utils import centernet_utils
 from ...utils import loss_utils
 import seaborn as sns;
+from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_a, draw_scenes_voxel_b
+
 
 sns.set()
 import matplotlib.pyplot as plt
-import tools.visual_utils.open3d_vis_utils as V
 
 
 class SeparateHead(nn.Module):
@@ -106,8 +110,8 @@ class BevShapeHead(nn.Module):
         self.add_module('reg_loss_func', loss_utils.RegLossCenterNet())
 
     def assign_target_of_single_head(
-            self, num_classes, gt_boxes, feature_map_size, feature_map_stride, num_max_objs=500,
-            gaussian_overlap=0.1, min_radius=2
+            self, num_classes, gt_boxes, feature_map_size, data_dict,
+            num_max_objs=500, bs_idx = None,
     ):
         """
         Args:
@@ -118,51 +122,77 @@ class BevShapeHead(nn.Module):
 
         """
         heatmap = gt_boxes.new_zeros(num_classes, feature_map_size[1], feature_map_size[0])
-        ret_boxes = gt_boxes.new_zeros((num_max_objs, gt_boxes.shape[-1] - 1 + 1))
         inds = gt_boxes.new_zeros(num_max_objs).long()
         mask = gt_boxes.new_zeros(num_max_objs).long()
 
-        x, y, z = gt_boxes[:, 0], gt_boxes[:, 1], gt_boxes[:, 2]
-        coord_x = (x - self.point_cloud_range[0]) / self.voxel_size[0] / feature_map_stride
-        coord_y = (y - self.point_cloud_range[1]) / self.voxel_size[1] / feature_map_stride
-        coord_x = torch.clamp(coord_x, min=0,
-                              max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
-        coord_y = torch.clamp(coord_y, min=0, max=feature_map_size[1] - 0.5)  #
-        center = torch.cat((coord_x[:, None], coord_y[:, None]), dim=-1)
-        center_int = center.int()
-        center_int_float = center_int.float()
+        # 生成car heatmap 真值
+        coord_c = data_dict['c_bm_spatial_features'][bs_idx].reshape(496, 432)
+        coord_c = (coord_c == 1).nonzero(as_tuple=False)
+        c_coord_x = coord_c[:, 0]
+        c_coord_y = coord_c[:, 1]
+        c_coord_x = torch.clamp(c_coord_x, min=0, max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
+        c_coord_y = torch.clamp(c_coord_y, min=0, max=feature_map_size[1] - 0.5)
+        c_center = torch.cat((c_coord_x[:, None], c_coord_y[:, None]), dim=-1)
+        c_center_int = c_center.int()
+        radius = torch.ones([c_center.shape[0]])*self.model_cfg.TARGET_ASSIGNER_CONFIG.C_RADIUS  # 高斯半径
 
-        dx, dy, dz = gt_boxes[:, 3], gt_boxes[:, 4], gt_boxes[:, 5]
-        dx = dx / self.voxel_size[0] / feature_map_stride
-        dy = dy / self.voxel_size[1] / feature_map_stride
-
-        radius = centernet_utils.gaussian_radius(dx, dy, min_overlap=gaussian_overlap)
-        radius = torch.clamp_min(radius.int(), min=min_radius)
-
-        for k in range(min(num_max_objs, gt_boxes.shape[0])):
-            if dx[k] <= 0 or dy[k] <= 0:
+        t1 = time.perf_counter()
+        for k in range(min(num_max_objs, c_center.shape[0])):  # 遍历每个bev shape像素
+            if not (0 <= c_center_int[k][0] <= feature_map_size[0] and 0 <= c_center_int[k][1] <= feature_map_size[1]):
                 continue
-
-            if not (0 <= center_int[k][0] <= feature_map_size[0] and 0 <= center_int[k][1] <= feature_map_size[1]):
-                continue
-
-            cur_class_id = (gt_boxes[k, -1] - 1).long()
-            centernet_utils.draw_gaussian_to_heatmap(heatmap[cur_class_id], center[k], radius[k].item())
-
-            inds[k] = center_int[k, 1] * feature_map_size[0] + center_int[k, 0]
+            cur_class_id = 0
+            centernet_utils.draw_gaussian_to_heatmap(heatmap[cur_class_id], c_center[k], radius[k].item())  # 对每个bev像素画高斯圆并存进heatmap
+            inds[k] = c_center_int[k, 1] * feature_map_size[0] + c_center_int[k, 0]
             mask[k] = 1
+        t2 = time.perf_counter()
+        print(t2-t1)
 
-            ret_boxes[k, 0:2] = center[k] - center_int_float[k].float()
-            ret_boxes[k, 2] = z[k]
-            ret_boxes[k, 3:6] = gt_boxes[k, 3:6].log()
-            ret_boxes[k, 6] = torch.cos(gt_boxes[k, 6])
-            ret_boxes[k, 7] = torch.sin(gt_boxes[k, 6])
-            if gt_boxes.shape[1] > 8:
-                ret_boxes[k, 8:] = gt_boxes[k, 7:-1]
+        # 生成ped heatmap 真值
+        coord_p = data_dict['p_bm_spatial_features'][bs_idx].reshape(496, 432)
+        coord_p = (coord_p == 1).nonzero(as_tuple=False)
+        p_coord_x = coord_p[:, 0]
+        p_coord_y = coord_p[:, 1]
+        p_coord_x = torch.clamp(p_coord_x, min=0, max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
+        p_coord_y = torch.clamp(p_coord_y, min=0, max=feature_map_size[1] - 0.5)  #
+        p_center = torch.cat((p_coord_x[:, None], p_coord_y[:, None]), dim=-1)
+        p_center_int = p_center.int()
+        radius = torch.ones([p_center.shape[0]])*self.model_cfg.TARGET_ASSIGNER_CONFIG.P_RADIUS
 
-        return heatmap, ret_boxes, inds, mask
+        t1 = time.perf_counter()
+        for k in range(min(num_max_objs, p_center.shape[0])):  # 遍历每个bev shape像素
+            if not (0 <= p_center_int[k][0] <= feature_map_size[0] and 0 <= p_center_int[k][1] <= feature_map_size[1]):
+                continue
+            cur_class_id = 1
+            centernet_utils.draw_gaussian_to_heatmap(heatmap[cur_class_id], p_center[k], radius[k].item())  # 对每个bev像素画高斯圆并存进heatmap
+            inds[k] = p_center_int[k, 1] * feature_map_size[0] + p_center_int[k, 0]
+            mask[k] = 1
+        t2 = time.perf_counter()
+        print(t2-t1)
 
-    def assign_targets(self, gt_boxes, feature_map_size=None, **kwargs):
+        # 生成cyc heatmap 真值
+        coord_cy = data_dict['cy_bm_spatial_features'][bs_idx].reshape(496, 432)
+        coord_cy = (coord_cy == 1).nonzero(as_tuple=False)
+        cy_coord_x = coord_cy[:, 0]
+        cy_coord_y = coord_cy[:, 1]
+        cy_coord_x = torch.clamp(cy_coord_x, min=0, max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
+        cy_coord_y = torch.clamp(cy_coord_y, min=0, max=feature_map_size[1] - 0.5)
+        cy_center = torch.cat((cy_coord_x[:, None], cy_coord_y[:, None]), dim=-1)
+        cy_center_int = cy_center.int()
+        radius = torch.ones([cy_center.shape[0]])*self.model_cfg.TARGET_ASSIGNER_CONFIG.CY_RADIUS
+
+        t1 = time.perf_counter()
+        for k in range(min(num_max_objs, cy_center.shape[0])):  # 遍历每个bev shape像素
+            if not (0 <= cy_center_int[k][0] <= feature_map_size[0] and 0 <= cy_center_int[k][1] <= feature_map_size[1]):
+                continue
+            cur_class_id = 2
+            centernet_utils.draw_gaussian_to_heatmap(heatmap[cur_class_id], cy_center[k], radius[k].item())  # 对每个bev像素画高斯圆并存进heatmap
+            inds[k] = cy_center_int[k, 1] * feature_map_size[0] + cy_center_int[k, 0]
+            mask[k] = 1
+        t2 = time.perf_counter()
+        print(t2-t1)
+        return heatmap, inds, mask
+
+    def assign_targets(self, data_dict, feature_map_size=None, **kwargs):
         """
         在assign_targets这个函数中，利用真值生成了基于高斯分布的heatmap,
         即基于指定的iou阈值生成gaussian radius，然后在范围内生成heatmap,与CenterNet没什么区别。
@@ -174,13 +204,13 @@ class BevShapeHead(nn.Module):
         Returns:
 
         """
+        gt_boxes = data_dict['gt_boxes']
         feature_map_size = feature_map_size[::-1]  # [H, W] ==> [x, y]      [176 200] to [200 176]
         target_assigner_cfg = self.model_cfg.TARGET_ASSIGNER_CONFIG
 
         batch_size = gt_boxes.shape[0]
         ret_dict = {
             'heatmaps': [],
-            'target_boxes': [],
             'inds': [],
             'masks': [],
             'heatmap_masks': []
@@ -207,20 +237,19 @@ class BevShapeHead(nn.Module):
                 else:
                     gt_boxes_single_head = torch.cat(gt_boxes_single_head, dim=0)
 
-                heatmap, ret_boxes, inds, mask = self.assign_target_of_single_head(
+                heatmap, inds, mask = self.assign_target_of_single_head(
                     num_classes=len(cur_class_names), gt_boxes=gt_boxes_single_head.cpu(),
-                    feature_map_size=feature_map_size, feature_map_stride=target_assigner_cfg.FEATURE_MAP_STRIDE,
+                    feature_map_size=feature_map_size,
+                    data_dict=data_dict,
                     num_max_objs=target_assigner_cfg.NUM_MAX_OBJS,
-                    gaussian_overlap=target_assigner_cfg.GAUSSIAN_OVERLAP,
-                    min_radius=target_assigner_cfg.MIN_RADIUS,
+                    bs_idx=bs_idx,
                 )
+
                 heatmap_list.append(heatmap.to(gt_boxes_single_head.device))
-                target_boxes_list.append(ret_boxes.to(gt_boxes_single_head.device))
                 inds_list.append(inds.to(gt_boxes_single_head.device))
                 masks_list.append(mask.to(gt_boxes_single_head.device))
 
             ret_dict['heatmaps'].append(torch.stack(heatmap_list, dim=0))
-            ret_dict['target_boxes'].append(torch.stack(target_boxes_list, dim=0))
             ret_dict['inds'].append(torch.stack(inds_list, dim=0))
             ret_dict['masks'].append(torch.stack(masks_list, dim=0))
         return ret_dict
@@ -229,7 +258,7 @@ class BevShapeHead(nn.Module):
         y = torch.clamp(x.sigmoid(), min=1e-4, max=1 - 1e-4)
         return y
 
-    def get_loss_center(self):
+    def get_loss_bev_shape(self):
         pred_dicts = self.forward_ret_dict['pred_dicts']
         target_dicts = self.forward_ret_dict['target_dicts']
         # fig = plt.figure(figsize=(10, 10))
@@ -238,29 +267,14 @@ class BevShapeHead(nn.Module):
         tb_dict = {}
         loss = 0
 
-        # center head分为三部分loss=热图hm loss + box回归loss
+        # 只包含hm loss
         for idx, pred_dict in enumerate(pred_dicts):
             pred_dict['hm'] = self.sigmoid(pred_dict['hm'])
             hm_loss = self.hm_loss_func(pred_dict['hm'], target_dicts['heatmaps'][idx])
             hm_loss *= self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['cls_weight']
 
-            target_boxes_centers = target_dicts['target_boxes'][idx][:, :, 0:3]  # 1 500 2
-            pred_centers = pred_dict['center']  # 1 2 400 352
-            pred_center_z = pred_dict['center_z']  # 1 1 400 352
-            p_cat = torch.cat((pred_centers, pred_center_z), dim=1)
-
-            # center回归loss
-            reg_loss = self.reg_loss_func(
-                p_cat, target_dicts['masks'][idx], target_dicts['inds'][idx], target_boxes_centers
-            )
-            loc_loss = (reg_loss * reg_loss.new_tensor(self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['code_weights'])).sum()
-            loc_loss = loc_loss * self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS['loc_weight']
-
-            loss += hm_loss + loc_loss
-            tb_dict['center_area_hm_loss_head_%d' % idx] = hm_loss.item()
-            tb_dict['center_area_loc_loss_head_%d' % idx] = loc_loss.item()
-
-        tb_dict['center_area_rpn_loss'] = loss.item()
+            loss += hm_loss
+            tb_dict['shape_hm_loss_head_%d' % idx] = hm_loss.item()
         return loss, tb_dict
 
     def forward(self, data_dict):
@@ -274,10 +288,24 @@ class BevShapeHead(nn.Module):
         if self.training:
             # assign_targets中，利用真值生成了基于高斯分布的heatmap
             target_dict = self.assign_targets(
-                data_dict['gt_boxes'], feature_map_size=spatial_features_2d.size()[2:],
+                data_dict, feature_map_size=spatial_features_2d.size()[2:],
                 feature_map_stride=data_dict.get('spatial_features_2d_strides', None)
             )
             self.forward_ret_dict['target_dicts'] = target_dict
+
+        # 可视化bev 热图真值
+        # vis = target_dict['heatmaps'][0][0][0]
+        # fig = plt.figure(figsize=(10, 10))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
+        # vis = target_dict['heatmaps'][0][0][1]
+        # fig = plt.figure(figsize=(10, 10))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
+        # vis = target_dict['heatmaps'][0][0][2]
+        # fig = plt.figure(figsize=(10, 10))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
 
         self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
         return data_dict

@@ -105,7 +105,9 @@ MODEL:
             FEATURE_MAP_STRIDE: 1
             NUM_MAX_OBJS: 10000
             GAUSSIAN_OVERLAP: 0.1
-            MIN_RADIUS: 2
+            C_RADIUS: 8
+            P_RADIUS: 2
+            CY_RADIUS: 2
 
         LOSS_CONFIG:
             LOSS_WEIGHTS: {

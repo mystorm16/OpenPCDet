@@ -8,7 +8,8 @@ from . import augmentor_utils, database_sampler, best_match_querier, multi_best_
 from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_spherical_voxels_points, draw_spherical_voxels_index
 
 SPECIAL_NAMES = ["bm_points", "miss_points", "self_points", "other_points", "miss_occ_points", "self_occ_points",
-                 "other_occ_points", "self_limit_occ_mask", "miss_full_occ_points", "other_full_occ_points"]
+                 "other_occ_points", "self_limit_occ_mask", "miss_full_occ_points", "other_full_occ_points",
+                 "c_bm_points", "p_bm_points", "cy_bm_points"]
 
 
 class DataAugmentor(object):
@@ -120,13 +121,18 @@ class DataAugmentor(object):
     def random_world_flip(self, data_dict=None, config=None, enable=None):
         if data_dict is None:
             return partial(self.random_world_flip, config=config, enable=enable)
-        gt_boxes, points, bm_points, miss_points, self_points, other_points = data_dict['gt_boxes'], data_dict[
-            'points'], data_dict['bm_points'] if "bm_points" in data_dict else None, data_dict[
-                                                                                  'miss_points'] if "miss_points" in data_dict else None, \
-                                                                              data_dict[
-                                                                                  'self_points'] if "self_points" in data_dict else None, \
-                                                                              data_dict[
-                                                                                  'other_points'] if "other_points" in data_dict else None
+        gt_boxes, points, bm_points, miss_points, self_points, other_points, c_bm_points, p_bm_points, cy_bm_points = \
+            data_dict['gt_boxes'], data_dict['points'], \
+            data_dict['bm_points'] if "bm_points" in data_dict else None, \
+            data_dict['miss_points'] if "miss_points" in data_dict else None, \
+            data_dict['self_points'] if "self_points" in data_dict else None, \
+            data_dict['other_points'] if "other_points" in data_dict else None,\
+            data_dict['c_bm_points'] if "c_bm_points" in data_dict else None, \
+            data_dict['p_bm_points'] if "p_bm_points" in data_dict else None, \
+            data_dict['cy_bm_points'] if "cy_bm_points" in data_dict else None, \
+
+
+
         special_points_lst = [data_dict[pt_key] for pt_key in SPECIAL_NAMES if pt_key in data_dict]
         special_name_lst = [pt_key for pt_key in SPECIAL_NAMES if pt_key in data_dict]
         for cur_axis in config['ALONG_AXIS_LIST']:
