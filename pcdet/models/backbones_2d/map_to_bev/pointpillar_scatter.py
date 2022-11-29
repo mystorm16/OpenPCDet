@@ -101,7 +101,7 @@ class PointPillarScatter(nn.Module):
 
             # 可视化car bev shape mask
             # vis = c_bm_batch_spatial_features.reshape(496, 432)
-            # fig = plt.figure(figsize=(6, 6))
+            # fig = plt.figure(figsize=(10, 10))
             # sns.heatmap(vis.cpu().numpy())
             # plt.show()
 

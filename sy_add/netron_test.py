@@ -1,9 +1,14 @@
-import numpy as np
-import mayavi.mlab as mlab
+import torch
+import time
 
-x, y = np.ogrid[-2:2:20j, -2:2:20j]
-z = x * np.exp( - x**2 - y**2)
-
-pl = mlab.surf(x, y, z, warp_scale="auto")
-mlab.axes(xlabel='x', ylabel='y', zlabel='z')
-mlab.outline(pl)
+batch_dict = torch.load("/media/ar304/T7/OpenPCDet/tools/test_batch.pth")
+module_list = torch.load("/media/ar304/T7/OpenPCDet/tools/bev_shape_model.pth")
+model = torch.nn.Sequential(module_list[0],
+                            module_list[1],
+                            module_list[2],
+                            module_list[3])
+for i in range(10):
+    t1 = time.perf_counter()
+    batch_dict = model(batch_dict)
+    t2 = time.perf_counter()
+    print(t2 - t1)

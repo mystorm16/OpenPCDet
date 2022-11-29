@@ -45,7 +45,6 @@ def gaussian2D(shape, sigma=1):
 
 
 def draw_gaussian_to_heatmap(heatmap, center, radius, k=1, valid_mask=None):
-    radius = int(radius)
     diameter = 2 * radius + 1
     gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)
 
@@ -67,6 +66,43 @@ def draw_gaussian_to_heatmap(heatmap, center, radius, k=1, valid_mask=None):
             masked_gaussian = masked_gaussian * cur_valid_mask.float()
 
         torch.max(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
+    return heatmap
+
+
+def sy_draw_gaussian_to_heatmap(heatmap, center, radius, class_idx):
+    diameter = 2 * radius + 1
+    gaussian = gaussian2D((diameter, diameter), sigma=diameter / 6)  # gaussian范围：（2*radius+1，2*radius+1）
+    gaussian = torch.tensor(gaussian).cuda()
+    for i in range(radius):
+        for j in range(radius):
+            c_center_gaussian = center + torch.tensor([i, j]).cuda()  # hm中的bev shape像素对应位置索引（绝对位置+相对位置）
+            # hm的对应位置赋值gaussian的对应位置 X,Y
+            c_center_gaussian[:, 0] = torch.clamp(c_center_gaussian[:, 0], min=0, max=495)
+            c_center_gaussian[:, 1] = torch.clamp(c_center_gaussian[:, 1], min=0, max=431)
+            heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]] = \
+                torch.max(heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]],
+                          gaussian[radius + i, radius + j])
+
+            c_center_gaussian = center + torch.tensor([i, -j]).cuda()
+            c_center_gaussian[:, 0] = torch.clamp(c_center_gaussian[:, 0], min=0, max=495)
+            c_center_gaussian[:, 1] = torch.clamp(c_center_gaussian[:, 1], min=0, max=431)
+            heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]] = \
+                torch.max(heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]],
+                          gaussian[radius + i, radius + j])
+
+            c_center_gaussian = center + torch.tensor([-i, -j]).cuda()
+            c_center_gaussian[:, 0] = torch.clamp(c_center_gaussian[:, 0], min=0, max=495)
+            c_center_gaussian[:, 1] = torch.clamp(c_center_gaussian[:, 1], min=0, max=431)
+            heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]] = \
+                torch.max(heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]],
+                          gaussian[radius + i, radius + j])
+
+            c_center_gaussian = center + torch.tensor([-i, j]).cuda()
+            c_center_gaussian[:, 0] = torch.clamp(c_center_gaussian[:, 0], min=0, max=495)
+            c_center_gaussian[:, 1] = torch.clamp(c_center_gaussian[:, 1], min=0, max=431)
+            heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]] = \
+                torch.max(heatmap[class_idx][c_center_gaussian[:, 0], c_center_gaussian[:, 1]],
+                          gaussian[radius + i, radius + j])
     return heatmap
 
 

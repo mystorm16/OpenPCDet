@@ -1,8 +1,11 @@
 import time
-
+import torch
 from .detector3d_template import Detector3DTemplate
 from tools.visual_utils.open3d_vis_utils import draw_scenes, draw_scenes_voxel_a, draw_scenes_voxel_b, \
     draw_spherical_voxels_index, draw_spherical_voxels_points
+import matplotlib.pyplot as plt
+import seaborn as sns;
+sns.set()
 
 class Bev_Shape_Pillar(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
@@ -11,7 +14,10 @@ class Bev_Shape_Pillar(Detector3DTemplate):
 
     def forward(self, batch_dict):
         for cur_module in self.module_list:
+            t1 = time.perf_counter()
             batch_dict = cur_module(batch_dict)
+            t2 = time.perf_counter()
+            print(t2-t1)
 
         if self.training:
             loss, tb_dict, disp_dict = self.get_training_loss()
@@ -35,3 +41,19 @@ class Bev_Shape_Pillar(Detector3DTemplate):
 
         loss = loss_bev_shape
         return loss, tb_dict, disp_dict
+
+    def post_processing(self, batch_dict):
+        score_thresh = self.model_cfg.POST_PROCESSING.SCORE_THRESH
+
+        # 按阈值二分类
+        hm_binary = batch_dict['bev_hm'].sigmoid()
+        mask = hm_binary > score_thresh
+        hm_binary[mask] = 1
+        hm_binary[~mask] = 0
+        batch_dict['hm_binary'] = hm_binary
+
+        # vis = batch_dict['hm_binary'][0][0]
+        # fig = plt.figure(figsize=(10, 10))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
+        return batch_dict

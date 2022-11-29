@@ -96,35 +96,27 @@ MODEL:
         USE_BIAS_BEFORE_NORM: True
         NUM_HM_CONV: 2
         SEPARATE_HEAD_CFG:
-            HEAD_ORDER: ['shape_reg']
+            HEAD_ORDER:
             HEAD_DICT: {
-                'shape_reg': {'out_channels': 2, 'num_conv': 2},
             }
 
         TARGET_ASSIGNER_CONFIG:
             FEATURE_MAP_STRIDE: 1
             NUM_MAX_OBJS: 10000
             GAUSSIAN_OVERLAP: 0.1
-            C_RADIUS: 8
+            C_RADIUS: 7
             P_RADIUS: 2
             CY_RADIUS: 2
 
         LOSS_CONFIG:
             LOSS_WEIGHTS: {
                 'cls_weight': 1.0,
-                'loc_weight': 2.0,
-                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
             }
 
-        POST_PROCESSING:
-            SCORE_THRESH: 0.1
-            POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
-            MAX_OBJ_PER_SAMPLE: 500
-            NMS_CONFIG:
-                NMS_TYPE: nms_gpu
-                NMS_THRESH: 0.7
-                NMS_PRE_MAXSIZE: 4096
-                NMS_POST_MAXSIZE: 500
+    POST_PROCESSING:
+        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+        SCORE_THRESH: 0.5
+        POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
 
 STAGEONE_OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4
