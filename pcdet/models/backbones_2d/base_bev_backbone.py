@@ -98,6 +98,9 @@ class BaseBEVBackbone(nn.Module):
         Returns:
         """
         spatial_features = data_dict['spatial_features']
+        # 融合hm特征
+
+        # bev_squeeze_features =
         # bev_squeeze_features = data_dict['bm_spatial_features']
         ups = []
         ret_dict = {}

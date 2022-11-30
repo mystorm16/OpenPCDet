@@ -23,6 +23,7 @@ DATA_CONFIG:
           }
 
         - NAME: bev_shape_mask_transform_points_to_voxels
+          TRAIN_BEV_SHAPE: False
           VOXEL_SIZE: [ 0.16, 0.16, 4 ]
           MAX_POINTS_PER_VOXEL: 1
           MAX_NUMBER_OF_VOXELS: {
@@ -65,58 +66,139 @@ DATA_CONFIG:
 
 MODEL:
     NAME: Bev_Shape_Pillar
+    BEV_SHAPE:
+        VFE:
+            NAME: PillarVFE
+            WITH_DISTANCE: False
+            USE_ABSLOTE_XYZ: True
+            USE_NORM: True
+            NUM_FILTERS: [64]
 
-    VFE:
-        NAME: PillarVFE
-        WITH_DISTANCE: False
-        USE_ABSLOTE_XYZ: True
-        USE_NORM: True
-        NUM_FILTERS: [64]
+        MAP_TO_BEV:
+            TRAIN_BEV_SHAPE: False  # 是否训练第一阶段网络
+            NAME: PointPillarScatter
+            NUM_BEV_FEATURES: 64
 
-    MAP_TO_BEV:
-        NAME: PointPillarScatter
-        NUM_BEV_FEATURES: 64
+        BACKBONE_2D:
+            NAME: BaseBEVBackbone
+            LAYER_NUMS: [3, 5, 5]  # 每个block有几层
+            LAYER_STRIDES: [1, 2, 2]  # 每个block的步长
+            NUM_FILTERS: [64, 128, 256]  # 每个block用几个卷积
+            UPSAMPLE_STRIDES: [1, 2, 4]  # 每个block的降采样步长
+            NUM_UPSAMPLE_FILTERS: [128, 128, 128]  # 上采样卷积个数
+
+        DENSE_HEAD:
+            TRAIN_BEV_SHAPE: False  # 是否训练第一阶段网络
+            NAME: BevShapeHead
+            CLASS_AGNOSTIC: False
+            CLASS_NAMES_EACH_HEAD: [
+                [ 'Car', 'Pedestrian', 'Cyclist' ]
+            ]
+
+            SHARED_CONV_CHANNEL: 64
+            USE_BIAS_BEFORE_NORM: True
+            NUM_HM_CONV: 2
+            SEPARATE_HEAD_CFG:
+                HEAD_ORDER:
+                HEAD_DICT: {
+                }
+
+            TARGET_ASSIGNER_CONFIG:
+                FEATURE_MAP_STRIDE: 1
+                NUM_MAX_OBJS: 10000
+                GAUSSIAN_OVERLAP: 0.1
+                C_RADIUS: 7
+                P_RADIUS: 2
+                CY_RADIUS: 2
+
+            LOSS_CONFIG:
+                LOSS_WEIGHTS: {
+                    'cls_weight': 1.0,
+                }
+
+        POST_PROCESSING:
+            RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+            SCORE_THRESH: 0.5
+            POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
 
     BACKBONE_2D:
         NAME: BaseBEVBackbone
         LAYER_NUMS: [3, 5, 5]  # 每个block有几层
-        LAYER_STRIDES: [1, 2, 2]  # 每个block的步长
+        LAYER_STRIDES: [2, 2, 2]  # 每个block的步长
         NUM_FILTERS: [64, 128, 256]  # 每个block用几个卷积
         UPSAMPLE_STRIDES: [1, 2, 4]  # 每个block的降采样步长
         NUM_UPSAMPLE_FILTERS: [128, 128, 128]  # 上采样卷积个数
 
     DENSE_HEAD:
-        NAME: BevShapeHead
+        NAME: AnchorHeadSingle
         CLASS_AGNOSTIC: False
-        CLASS_NAMES_EACH_HEAD: [
-            [ 'Car', 'Pedestrian', 'Cyclist' ]
+
+        USE_DIRECTION_CLASSIFIER: True
+        DIR_OFFSET: 0.78539
+        DIR_LIMIT_OFFSET: 0.0
+        NUM_DIR_BINS: 2
+
+        ANCHOR_GENERATOR_CONFIG: [
+            {
+                'class_name': 'Car',
+                'anchor_sizes': [[3.9, 1.6, 1.56]],
+                'anchor_rotations': [0, 1.57],
+                'anchor_bottom_heights': [-1.78],
+                'align_center': False,
+                'feature_map_stride': 2,
+                'matched_threshold': 0.6,
+                'unmatched_threshold': 0.45
+            },
+            {
+                'class_name': 'Pedestrian',
+                'anchor_sizes': [[0.8, 0.6, 1.73]],
+                'anchor_rotations': [0, 1.57],
+                'anchor_bottom_heights': [-0.6],
+                'align_center': False,
+                'feature_map_stride': 2,
+                'matched_threshold': 0.5,
+                'unmatched_threshold': 0.35
+            },
+            {
+                'class_name': 'Cyclist',
+                'anchor_sizes': [[1.76, 0.6, 1.73]],
+                'anchor_rotations': [0, 1.57],
+                'anchor_bottom_heights': [-0.6],
+                'align_center': False,
+                'feature_map_stride': 2,
+                'matched_threshold': 0.5,
+                'unmatched_threshold': 0.35
+            }
         ]
 
-        SHARED_CONV_CHANNEL: 64
-        USE_BIAS_BEFORE_NORM: True
-        NUM_HM_CONV: 2
-        SEPARATE_HEAD_CFG:
-            HEAD_ORDER:
-            HEAD_DICT: {
-            }
-
         TARGET_ASSIGNER_CONFIG:
-            FEATURE_MAP_STRIDE: 1
-            NUM_MAX_OBJS: 10000
-            GAUSSIAN_OVERLAP: 0.1
-            C_RADIUS: 7
-            P_RADIUS: 2
-            CY_RADIUS: 2
+            NAME: AxisAlignedTargetAssigner
+            POS_FRACTION: -1.0
+            SAMPLE_SIZE: 512
+            NORM_BY_NUM_EXAMPLES: False
+            MATCH_HEIGHT: False
+            BOX_CODER: ResidualCoder
 
         LOSS_CONFIG:
             LOSS_WEIGHTS: {
                 'cls_weight': 1.0,
+                'loc_weight': 2.0,
+                'dir_weight': 0.2,
+                'code_weights': [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
             }
 
     POST_PROCESSING:
-        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
-        SCORE_THRESH: 0.5
-        POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
+      RECALL_THRESH_LIST: [ 0.3, 0.5, 0.7 ]
+      SCORE_THRESH: 0.1
+      OUTPUT_RAW_SCORE: False
+      EVAL_METRIC: kitti
+      NMS_CONFIG:
+        MULTI_CLASSES_NMS: False
+        NMS_TYPE: nms_gpu
+        NMS_THRESH: 0.01
+        NMS_PRE_MAXSIZE: 4096
+        NMS_POST_MAXSIZE: 500
+
 
 STAGEONE_OPTIMIZATION:
     BATCH_SIZE_PER_GPU: 4

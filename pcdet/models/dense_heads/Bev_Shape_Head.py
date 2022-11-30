@@ -108,7 +108,6 @@ class BevShapeHead(nn.Module):
 
     def build_losses(self):
         self.add_module('hm_loss_func', loss_utils.FocalLossCenterNet())
-        self.add_module('reg_loss_func', loss_utils.RegLossCenterNet())
 
     def assign_target_of_single_head(
             self, num_classes, gt_boxes, feature_map_size, feature_map_stride, num_max_objs=500,
@@ -357,13 +356,27 @@ class BevShapeHead(nn.Module):
         for head in self.heads_list:
             pred_dicts.append(head(x))  # 对降维到64后的BEV feature每个像素位置预测center 1、centerz 1、dim 3、rot 2、hm 1
 
-        if self.training:
+        if self.model_cfg.TRAIN_BEV_SHAPE == True:
             # 利用真值生成了基于高斯分布的heatmap
             target_dict = self.sy_assign_targets(
                 data_dict, feature_map_size=spatial_features_2d.size()[2:],
                 feature_map_stride=data_dict.get('spatial_features_2d_strides', None)
             )
             self.forward_ret_dict['target_dicts'] = target_dict
+
+        self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
+        data_dict['bev_hm'] = pred_dicts[0]['hm'].sigmoid()
+
+        # 按阈值二分类
+        hm_binary = data_dict['bev_hm'].sigmoid()
+        mask = hm_binary > 0.5
+        hm_binary[mask] = 1
+        hm_binary[~mask] = 0
+        data_dict['hm_binary'] = hm_binary
+        for i in range(data_dict['batch_size']):
+            data_dict['hm_binary_fuse'] = hm_binary[i, 0, :, :]+hm_binary[i, 1, :, :]+hm_binary[i, 2, :, :]
+        data_dict['hm_binary_fuse'] = torch.clamp(data_dict['hm_binary_fuse'], max=1)
+
 
         # 可视化bev 热图真值
         # vis = target_dict['heatmaps'][0][0][0]
@@ -379,6 +392,5 @@ class BevShapeHead(nn.Module):
         # sns.heatmap(vis.cpu().numpy())
         # plt.show()
 
-        self.forward_ret_dict['pred_dicts'] = pred_dicts  # 每个feature map像素(200*176)预测center、centerz、dim、rot、hm
-        data_dict['bev_hm'] = pred_dicts[0]['hm']
+
         return data_dict
