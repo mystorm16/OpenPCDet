@@ -40,7 +40,7 @@ class PointPillarScatter(nn.Module):
         batch_spatial_features = batch_spatial_features.view(batch_size, 64 * self.nz, self.ny, self.nx)
         batch_dict['spatial_features'] = batch_spatial_features
 
-        if self.model_cfg.TRAIN_BEV_SHAPE == True:
+        if 0:
             # bm points转2D BEV图
             batch_dict['bm_pillar_features'] = torch.ones(  # 先创建一个N*1的全1 tensor
                 batch_dict['bm_voxels'].shape[0], 1,

@@ -97,20 +97,25 @@ class BaseBEVBackbone(nn.Module):
                 spatial_features
         Returns:
         """
-        spatial_features = data_dict['spatial_features']
-        # 融合hm特征
-
-        # bev_squeeze_features =
-        # bev_squeeze_features = data_dict['bm_spatial_features']
+        spatial_features = data_dict['spatial_features']  # 原版特征 1 64 496 432
         ups = []
         ret_dict = {}
         x = spatial_features
+
+        # 融合hm特征
+        if data_dict.__contains__('hm_binary_fuse'):
+            flag_fuse_features = True
+            x = torch.cat((x, data_dict['hm_binary_fuse']), dim=1)
+        else:
+            flag_fuse_features = False
+
         for i in range(len(self.blocks)):
             # bev多层特征融合
-            # x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)
-            # x = torch.cat((x, x_bev), dim=1)
+            # if flag_fuse_features == True:
+            #     bev_squeeze_features = data_dict['hm_binary_fuse']
+            #     x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)
+            #     x = torch.cat((x, x_bev), dim=1)
             x = self.blocks[i](x)
-
             stride = int(spatial_features.shape[2] / x.shape[2])
             ret_dict['spatial_features_%dx' % stride] = x
             if len(self.deblocks) > 0:

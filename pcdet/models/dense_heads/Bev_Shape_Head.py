@@ -356,7 +356,7 @@ class BevShapeHead(nn.Module):
         for head in self.heads_list:
             pred_dicts.append(head(x))  # 对降维到64后的BEV feature每个像素位置预测center 1、centerz 1、dim 3、rot 2、hm 1
 
-        if self.model_cfg.TRAIN_BEV_SHAPE == True:
+        if 0:
             # 利用真值生成了基于高斯分布的heatmap
             target_dict = self.sy_assign_targets(
                 data_dict, feature_map_size=spatial_features_2d.size()[2:],
@@ -369,13 +369,22 @@ class BevShapeHead(nn.Module):
 
         # 按阈值二分类
         hm_binary = data_dict['bev_hm'].sigmoid()
-        mask = hm_binary > 0.5
+        mask = hm_binary > 0.6
         hm_binary[mask] = 1
         hm_binary[~mask] = 0
         data_dict['hm_binary'] = hm_binary
+        hm_binary_fuse = []
         for i in range(data_dict['batch_size']):
-            data_dict['hm_binary_fuse'] = hm_binary[i, 0, :, :]+hm_binary[i, 1, :, :]+hm_binary[i, 2, :, :]
-        data_dict['hm_binary_fuse'] = torch.clamp(data_dict['hm_binary_fuse'], max=1)
+            hm_binary_tensor = hm_binary[i, 0, :, :]+hm_binary[i, 1, :, :]+hm_binary[i, 2, :, :]
+            hm_binary_fuse.append(hm_binary_tensor.unsqueeze(0))
+        hm_binary_fuse = torch.cat(hm_binary_fuse)
+        hm_binary_fuse = torch.clamp(hm_binary_fuse, max=1)
+        data_dict['hm_binary_fuse'] = hm_binary_fuse.unsqueeze(1)
+        # 可视化融合的二分类黑白mask
+        # vis = data_dict['hm_binary_fuse'][0][0].detach()
+        # fig = plt.figure(figsize=(10, 10))
+        # sns.heatmap(vis.cpu().numpy())
+        # plt.show()
 
 
         # 可视化bev 热图真值
@@ -391,6 +400,7 @@ class BevShapeHead(nn.Module):
         # fig = plt.figure(figsize=(10, 10))
         # sns.heatmap(vis.cpu().numpy())
         # plt.show()
+
 
 
         return data_dict

@@ -11,6 +11,7 @@ class Bev_Shape_Pillar(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
         self.bev_shape_module_list, self.module_list = self.build_networks()
+        self.bev_shape_module_list = torch.load("/media/ar304/T7/OpenPCDet/tools/bev_shape_model.pth")
 
     def forward(self, batch_dict):
         for cur_module in self.bev_shape_module_list:
@@ -41,12 +42,15 @@ class Bev_Shape_Pillar(Detector3DTemplate):
         disp_dict = {}
 
         loss_bev_shape, tb_dict = self.bev_shape_modules.dense_head.get_loss_bev_shape()
+        loss_rpn, tb_dict = self.dense_head.get_loss()
+
         tb_dict = {
+            'loss_rpn': loss_rpn.item(),
             'loss_bev_shape': loss_bev_shape.item(),
             **tb_dict
         }
 
-        loss = loss_bev_shape
+        loss = loss_rpn
         return loss, tb_dict, disp_dict
 
     def bev_shape_post_processing(self, batch_dict):
