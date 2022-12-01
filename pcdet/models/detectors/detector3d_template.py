@@ -33,7 +33,7 @@ class Detector3DTemplate(nn.Module):
 
         self.module_topology = [
             # 'center_area', 'occ', 'center_det',
-            'bev_shape',
+            # 'bev_shape',
             'vfe', 'backbone_3d', 'map_to_bev_module', 'pfe',  # 包容原版网络
             'backbone_2d', 'dense_head', 'point_head', 'roi_head'
         ]

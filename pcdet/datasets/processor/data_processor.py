@@ -222,8 +222,8 @@ class DataProcessor(object):
             # just bind the config, we will create the VoxelGeneratorWrapper later,
             # to avoid pickling issues in multiprocess spawn
             return partial(self.bev_shape_mask_transform_points_to_voxels, config=config)
-        # if config.TRAIN_BEV_SHAPE == False:
-        #     return data_dict
+        if config.TRAIN_BEV_SHAPE == False:
+            return data_dict
 
         if self.voxel_generator_bm is None:
             self.voxel_generator_bm = VoxelGeneratorWrapper(

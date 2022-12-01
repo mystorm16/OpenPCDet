@@ -356,7 +356,7 @@ class BevShapeHead(nn.Module):
         for head in self.heads_list:
             pred_dicts.append(head(x))  # 对降维到64后的BEV feature每个像素位置预测center 1、centerz 1、dim 3、rot 2、hm 1
 
-        if self.training:
+        if data_dict['train_bev_shape'] == True:
             # 利用真值生成了基于高斯分布的heatmap
             target_dict = self.sy_assign_targets(
                 data_dict, feature_map_size=spatial_features_2d.size()[2:],
@@ -369,7 +369,7 @@ class BevShapeHead(nn.Module):
 
 
         # 按阈值二分类
-        hm_binary = data_dict['bev_hm']
+        hm_binary = copy.deepcopy(data_dict['bev_hm'].detach())
         mask = hm_binary > 0.6
         hm_binary[mask] = 1
         hm_binary[~mask] = 0
