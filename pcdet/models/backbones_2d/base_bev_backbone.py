@@ -35,7 +35,7 @@ class BaseBEVBackbone(nn.Module):
             cur_layers = [
                 nn.ZeroPad2d(1),  # 图像四周都填充0
                 nn.Conv2d(
-                    c_in_list[idx]+1, num_filters[idx], kernel_size=3,  # +1(融了一维特征)
+                    c_in_list[idx]+2, num_filters[idx], kernel_size=3,  # +1(融了一维特征) +2(融了两维特征)
                     stride=layer_strides[idx], padding=0, bias=False
                 ),
                 nn.BatchNorm2d(num_filters[idx], eps=1e-3, momentum=0.01),
@@ -108,6 +108,7 @@ class BaseBEVBackbone(nn.Module):
         if data_dict.__contains__('hm_binary_fuse'):
             flag_fuse_features = True
             data_dict['hm_binary_fuse'] = data_dict['hm_binary_fuse'].detach()
+            data_dict['hm_prob_fuse'] = data_dict['hm_prob_fuse'].detach()
             # x = torch.cat((x, data_dict['hm_binary_fuse']), dim=1)
             # vis = data_dict['hm_binary_fuse'][0][0].detach().cpu().numpy()
             # fig = plt.figure(figsize=(10, 10))
@@ -117,11 +118,18 @@ class BaseBEVBackbone(nn.Module):
             flag_fuse_features = False
 
         for i in range(len(self.blocks)):
-            # bev多层特征融合
+            # bev特征融合
             if flag_fuse_features == True:
-                bev_squeeze_features = data_dict['hm_binary_fuse']
-                x_bev = self.bev_squeeze_blocks[i](bev_squeeze_features)  # bev特征压缩
-                x = torch.cat((x, x_bev), dim=1)
+                # 融合二值化特征
+                bev_squeeze_features_binary = data_dict['hm_binary_fuse']
+                x_bev_binary = self.bev_squeeze_blocks[i](bev_squeeze_features_binary)  # bev特征压缩
+                x = torch.cat((x, x_bev_binary), dim=1)
+
+                # 融合预测概率特征
+                bev_squeeze_features_prob = data_dict['hm_prob_fuse']
+                x_bev_prob = self.bev_squeeze_blocks[i](bev_squeeze_features_prob)  # bev特征压缩
+                x = torch.cat((x, x_bev_prob), dim=1)
+
             x = self.blocks[i](x)
             stride = int(spatial_features.shape[2] / x.shape[2])
             ret_dict['spatial_features_%dx' % stride] = x

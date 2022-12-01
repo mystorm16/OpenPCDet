@@ -370,17 +370,33 @@ class BevShapeHead(nn.Module):
 
         # 按阈值二分类
         hm_binary = copy.deepcopy(data_dict['bev_hm'].detach())
-        mask = hm_binary > 0.6
+        hm_prob = copy.deepcopy(data_dict['bev_hm'].detach())
+
+        mask = hm_binary > 0.3
         hm_binary[mask] = 1
         hm_binary[~mask] = 0
+        hm_prob[~mask] = 0
+
         data_dict['hm_binary'] = hm_binary
+        data_dict['hm_prob'] = hm_prob
+
         hm_binary_fuse = []
+        hm_prob_fuse = []
         for i in range(data_dict['batch_size']):
             hm_binary_tensor = hm_binary[i, 0, :, :]+hm_binary[i, 1, :, :]+hm_binary[i, 2, :, :]
             hm_binary_fuse.append(hm_binary_tensor.unsqueeze(0))
+
+            hm_prob_tensor = hm_prob[i, 0, :, :]+hm_prob[i, 1, :, :]+hm_prob[i, 2, :, :]
+            hm_prob_fuse.append(hm_prob_tensor.unsqueeze(0))
+
         hm_binary_fuse = torch.cat(hm_binary_fuse)
         hm_binary_fuse = torch.clamp(hm_binary_fuse, max=1)
         data_dict['hm_binary_fuse'] = hm_binary_fuse.unsqueeze(1)
+
+        hm_prob_fuse = torch.cat(hm_prob_fuse)
+        hm_prob_fuse = torch.clamp(hm_prob_fuse, max=1)
+        data_dict['hm_prob_fuse'] = hm_prob_fuse.unsqueeze(1)
+
         # 可视化融合的二分类黑白mask
         # vis = data_dict['hm_binary_fuse'][0][0].detach()
         # fig = plt.figure(figsize=(10, 10))
