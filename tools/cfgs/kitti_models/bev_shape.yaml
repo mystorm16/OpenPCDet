@@ -89,6 +89,8 @@ MODEL:
 
         DENSE_HEAD:
             NAME: BevShapeHead
+
+            TRAIN_BEV_SHAPE_THRESH: 0.6  # bev 输出阈值
             CLASS_AGNOSTIC: False
             CLASS_NAMES_EACH_HEAD: [
                 [ 'Car', 'Pedestrian', 'Cyclist' ]
@@ -138,6 +140,7 @@ MODEL:
         NUM_FILTERS: [64, 128, 256]  # 每个block用几个卷积
         UPSAMPLE_STRIDES: [1, 2, 4]  # 每个block的降采样步长
         NUM_UPSAMPLE_FILTERS: [128, 128, 128]  # 上采样卷积个数
+        INPUT_CHANNELS: 64  # 2D卷积输入通道数
 
     DENSE_HEAD:
         NAME: AnchorHeadSingle

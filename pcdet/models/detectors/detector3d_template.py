@@ -397,7 +397,7 @@ class Detector3DTemplate(nn.Module):
             backbone_2d_module = backbones_2d.__all__[self.model_cfg.BACKBONE_2D.NAME](
                 model_cfg=self.model_cfg.BACKBONE_2D,
                 # input_channels=model_info_dict['num_bev_features']
-                input_channels=65  # 融合一维bev特征
+                input_channels=self.model_cfg.BACKBONE_2D.INPUT_CHANNELS  # 融合一维bev特征 64
             )
 
         if type == 'occ':
