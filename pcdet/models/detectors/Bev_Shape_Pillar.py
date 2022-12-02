@@ -10,13 +10,12 @@ sns.set()
 class Bev_Shape_Pillar(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
-        _, self.module_list = self.build_networks()
+        self.bev_shape_module_lists, self.module_list = self.build_networks()
         self.train_bev_shape = model_cfg.BEV_SHAPE.TRAIN_BEV_SHAPE
-        self.bev_shape_net = torch.load("bev_shape_net.pth")  # 加载bev shape net网络
 
     def forward(self, batch_dict):
         batch_dict['train_bev_shape'] = self.train_bev_shape
-        for cur_module in self.bev_shape_net.module_list:
+        for cur_module in self.bev_shape_module_lists:
             batch_dict = cur_module(batch_dict)
 
         for cur_module in self.module_list:
@@ -35,15 +34,14 @@ class Bev_Shape_Pillar(Detector3DTemplate):
 
     def get_training_loss(self):
         disp_dict = {}
-        # loss_bev_shape, tb_dict = self.bev_shape_modules.dense_head.get_loss_bev_shape()
+        loss_bev_shape, tb_dict = self.bev_shape_modules.dense_head.get_loss_bev_shape()
         loss_rpn, tb_dict = self.dense_head.get_loss()
 
         tb_dict = {
             'loss_rpn': loss_rpn.item(),
-            # 'loss_bev_shape': loss_bev_shape.item(),
+            'loss_bev_shape': loss_bev_shape.item(),
             **tb_dict
         }
 
-        # loss = loss_rpn + loss_bev_shape
-        loss = loss_rpn
+        loss = loss_rpn + 2*loss_bev_shape
         return loss, tb_dict, disp_dict

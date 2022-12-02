@@ -4,89 +4,31 @@ import torch
 import torch.nn as nn
 from ...utils.spconv_utils import find_all_spconv_keys
 from ...ops.iou3d_nms import iou3d_nms_utils
-from .. import backbones_2d, backbones_3d, dense_heads, roi_heads, occ_pnt
-from ..occ_pnt import occ_dense_heads, occ_training_targets
+from .. import backbones_2d, backbones_3d, dense_heads, roi_heads
 from ..backbones_2d import map_to_bev
 from ..backbones_3d import pfe, vfe
 from ..model_utils import model_nms_utils
-from ...utils import coords_utils, point_box_utils
-from ...ops.roiaware_pool3d import roiaware_pool3d_utils
-
 
 class Detector3DTemplate(nn.Module):
-    def __init__(self, model_cfg, num_class, dataset, full_config=None):
+    def __init__(self, model_cfg, num_class, dataset):
         super().__init__()
         self.model_cfg = model_cfg
         self.num_class = num_class
-        if model_cfg.get("OCC", None) is not None:
-            self.occ_num_class = 1 if model_cfg.OCC.PARAMS.CLASS_AGNOSTIC else num_class
-        else:
-            self.occ_num_class = None
         self.dataset = dataset
         self.class_names = dataset.class_names
         self.register_buffer('global_step', torch.LongTensor(1).zero_())
-
-        # self.module_topology = [
-        #     'occ', 'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'occ_pfe', 'occ_point_head', 'pfe',
-        #     'dense_head', 'point_head', 'roi_head'
-        # ]
-
         self.module_topology = [
-            # 'center_area', 'occ', 'center_det',
-            # 'bev_shape',
+            'bev_shape',
             'vfe', 'backbone_3d', 'map_to_bev_module', 'pfe',  # 包容原版网络
             'backbone_2d', 'dense_head', 'point_head', 'roi_head'
         ]
-
-        self.occ_module_topology = [
-            'occ_targets', 'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'occ_dense_head', 'occ_pnt_update'
-        ]
-
-        self.center_area_module_topology = [
-            'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'dense_head'
-        ]
-
-        self.center_det_module_topology = [
-            'vfe', 'backbone_3d', 'map_to_bev_module', 'backbone_2d', 'dense_head'
-        ]
-
         self.bev_shape_module_topology = [
             'vfe', 'map_to_bev_module', 'backbone_2d', 'dense_head',
         ]
-
         self.voxel_centers = None
-        if self.dataset.dataset_cfg.get('OCC', None) is not None:
-            self.voxel_centers = self.create_subvox_loc()
-
-        self.occ_modules = nn.Module()
-        self.center_modules = nn.Module()
-        self.center_det_modules = nn.Module()
         self.bev_shape_modules = nn.Module()
-
         self.clamp_max = self.dataset.dataset_cfg.get("CLAMP", None)
-        self.occ_dim = self.dataset.occ_dim
         self.print = False
-
-    def filter_by_bind(self, trgt_binds, binds, points):
-        trgt_binds = trgt_binds.to(torch.int64)
-        inds = torch.nonzero(binds == trgt_binds)
-        points = points[inds[:, 0], ...].data.cpu().numpy()
-        return points
-
-    def create_subvox_loc(self):
-        nx, ny, nz = self.dataset.occ_grid_size
-        x_origin = self.dataset.dataset_cfg.OCC.POINT_CLOUD_RANGE[0]
-        y_origin = self.dataset.dataset_cfg.OCC.POINT_CLOUD_RANGE[1]
-        z_origin = self.dataset.dataset_cfg.OCC.POINT_CLOUD_RANGE[2]
-        range_origin = [x_origin, y_origin, z_origin]
-        grids_num = torch.tensor([nx, ny, nz], dtype=torch.int32, device="cuda")
-        voxel_size = torch.tensor(self.dataset.dataset_cfg.OCC.VOXEL_SIZE, dtype=torch.float32, device="cuda")
-        all_voxel_centers = coords_utils.get_all_voxel_centers_zyx(1, grids_num, range_origin, voxel_size)[
-            0, ...]  # 3 sphere zyx nz ny nx
-        all_voxel_centers = torch.stack(
-            [all_voxel_centers[2, ...], all_voxel_centers[1, ...], all_voxel_centers[0, ...]], dim=-1)
-        all_voxel_centers_2d = torch.mean(all_voxel_centers[:, :, :, :2], dim=0).view(-1, 2)  # N, 2
-        return {"all_voxel_centers": all_voxel_centers, "all_voxel_centers_2d": all_voxel_centers_2d}
 
     @property
     def mode(self):
@@ -98,20 +40,12 @@ class Detector3DTemplate(nn.Module):
     def build_networks(self):
         model_info_dict = {
             'module_list': [],
-            'occ_module_list': [],
-            'center_module_list': [],
-            'center_det_module_list': [],
             'bev_shape_module_list': [],
             'num_rawpoint_features': self.dataset.point_feature_encoder.num_point_features,
             'num_voxel_point_features': self.dataset.point_feature_encoder.num_point_features,
             'num_point_features': self.dataset.point_feature_encoder.num_point_features,
-            'center_grid_size': self.dataset.center_grid_size,
-            'occ_grid_size': self.dataset.occ_grid_size,
             'grid_size': self.dataset.grid_size,
             'point_cloud_range': self.dataset.point_cloud_range,
-            'occ_point_cloud_range': self.dataset.occ_point_cloud_range,
-            'occ_voxel_size': self.dataset.occ_voxel_size,
-            'center_voxel_size': self.dataset.center_voxel_size,
             'voxel_size': self.dataset.voxel_size,
             'depth_downsample_factor': self.dataset.depth_downsample_factor
         }
@@ -123,7 +57,7 @@ class Detector3DTemplate(nn.Module):
             self.add_module(module_name, module)
         return model_info_dict['bev_shape_module_list'], model_info_dict['module_list']
 
-    # 构建occ子网络
+    # 构建bev_shapes子网络
     def build_bev_shape(self, model_info_dict):
         if self.model_cfg.get('BEV_SHAPE', None) is None:
             return None, model_info_dict
@@ -136,116 +70,8 @@ class Detector3DTemplate(nn.Module):
                 self.bev_shape_modules.add_module(module_name, module)
         return None, model_info_dict
 
-    # 构建occ子网络
-    def build_occ(self, model_info_dict):
-        if self.model_cfg.get('OCC', None) is None:
-            return None, model_info_dict
-
-        for module_name in self.occ_module_topology:
-            module, model_info_dict = getattr(self, 'build_%s' % module_name)(
-                model_info_dict=model_info_dict, type='occ'
-            )
-            # self.add_module('occ_%s' % module_name, module)
-            if module is not None:
-                self.occ_modules.add_module(module_name, module)
-                if self.print: print("occ module:", module_name)
-        return None, model_info_dict
-
-    # 构建center area子网络
-    def build_center_area(self, model_info_dict):
-        if self.model_cfg.get('CENTER_AREA', None) is None:
-            return None, model_info_dict
-        for module_name in self.center_area_module_topology:
-            module, model_info_dict = getattr(self, 'build_%s' % module_name)(
-                model_info_dict=model_info_dict, type='center'
-            )
-            if module is not None:
-                self.center_modules.add_module(module_name, module)
-        return None, model_info_dict
-
-    # 构建center det子网络
-    def build_center_det(self, model_info_dict):
-        if self.model_cfg.get('CENTER_DET', None) is None:
-            return None, model_info_dict
-        for module_name in self.center_det_module_topology:
-            module, model_info_dict = getattr(self, 'build_%s' % module_name)(
-                model_info_dict=model_info_dict, type='center_det'
-            )
-            if module is not None:
-                self.center_det_modules.add_module(module_name, module)
-        return None, model_info_dict
-
-    # occ第一阶段网络
-    def build_occ_targets(self, model_info_dict, type=None):
-        model_cfg = self.model_cfg.OCC
-        if model_cfg.get('TARGETS', None) is None:
-            return None, model_info_dict
-        occ_target_module = occ_training_targets.__all__[model_cfg.TARGETS.NAME](
-            model_cfg=model_cfg,
-            point_cloud_range=model_info_dict['occ_point_cloud_range'],
-            voxel_size=model_info_dict['occ_voxel_size'],
-            data_cfg=self.dataset.dataset_cfg,
-            grid_size=model_info_dict['occ_grid_size'],
-            num_class=self.occ_num_class,
-            voxel_centers=self.voxel_centers,
-        )
-        model_info_dict['occ_module_list'].append(occ_target_module)
-        return occ_target_module, model_info_dict
-
-    # occ最后阶段网络
-    def build_occ_pnt_update(self, model_info_dict, type=None, occ=True):
-        model_cfg = self.model_cfg.OCC if occ else self.model_cfg
-        if model_cfg.get('OCC_PNT_UPDATE', None) is None:
-            return None, model_info_dict
-
-        occ_pnt_module = occ_pnt.__all__[model_cfg.OCC_PNT_UPDATE.NAME](
-            model_cfg=model_cfg,
-            data_cfg=self.dataset.dataset_cfg,
-            point_cloud_range=model_info_dict['point_cloud_range'],
-            occ_voxel_size=model_info_dict['occ_voxel_size'],
-            occ_grid_size=model_info_dict['occ_grid_size'],
-            center_voxel_size=model_info_dict['center_voxel_size'],
-            center_grid_size=model_info_dict['center_grid_size'],
-            mode=self.dataset.mode,
-            voxel_centers=self.voxel_centers,
-        )
-        if self.print: print("build occ pnt update mode:", self.dataset.mode)
-        model_info_dict['occ_module_list'].append(occ_pnt_module)
-        if occ_pnt_module.config_rawadd:
-            model_info_dict['num_rawpoint_features'] = model_info_dict[
-                                                           'num_rawpoint_features'] + occ_pnt_module.code_num_dim
-        model_info_dict['num_voxel_point_features'] = model_info_dict[
-                                                          'num_voxel_point_features'] + occ_pnt_module.code_num_dim
-        return occ_pnt_module, model_info_dict
-
     def build_vfe(self, model_info_dict, type=None):
-        if type == 'center':
-            model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'occ':
-            model_cfg = self.model_cfg.OCC
-        elif type == 'center_det':
-            model_cfg = self.model_cfg.CENTER_DET
-
-        if type == 'center' or type == 'occ' or type == 'center_det':
-            if model_cfg.get('VFE', None) is None:
-                return None, model_info_dict
-            maxprob = False
-            if type != 'occ':
-                maxprob = self.dataset.dataset_cfg.OCC.MAX_VFE if self.dataset.dataset_cfg.get('OCC',
-                                                                                               None) is not None and self.dataset.dataset_cfg.OCC.get(
-                    "MAX_VFE", None) is not None else False
-            vfe_module = vfe.__all__[model_cfg.VFE.NAME](
-                model_cfg=model_cfg.VFE,
-                num_point_features=model_info_dict['num_voxel_point_features'],
-                point_cloud_range=model_info_dict['point_cloud_range'],
-                voxel_size=model_info_dict['occ_voxel_size'] if type == 'occ' else model_info_dict['center_voxel_size'],
-                data_cfg=self.dataset.dataset_cfg,
-                grid_size=model_info_dict['occ_grid_size'] if type == 'occ' else model_info_dict['center_grid_size'],
-                num_class=self.occ_num_class if type == 'occ' else self.num_class,
-                maxprob=maxprob,
-                vfe_type=type,
-            )
-        elif type == "bev_shape":
+        if type == "bev_shape":
             model_cfg = self.model_cfg.BEV_SHAPE
             vfe_module = vfe.__all__[model_cfg.VFE.NAME](
                 model_cfg=model_cfg.VFE,
@@ -267,83 +93,30 @@ class Detector3DTemplate(nn.Module):
                 depth_downsample_factor=model_info_dict['depth_downsample_factor']
             )
         model_info_dict['num_point_features'] = vfe_module.get_output_feature_dim()
-        if type == 'occ':
-            model_info_dict['occ_module_list'].append(vfe_module)
-        elif type == 'center':
-            model_info_dict['center_module_list'].append(vfe_module)
-        elif type == 'center_det':
-            model_info_dict['center_det_module_list'].append(vfe_module)
-        elif type == 'bev_shape':
+        if type == 'bev_shape':
             model_info_dict['bev_shape_module_list'].append(vfe_module)
         else:
             model_info_dict['module_list'].append(vfe_module)
         return vfe_module, model_info_dict
 
     def build_backbone_3d(self, model_info_dict, type=None):
-        if type == 'center':
-            model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'occ':
-            model_cfg = self.model_cfg.OCC
-        elif type == 'center_det':
-            model_cfg = self.model_cfg.CENTER_DET
-        input_channels = model_info_dict['num_point_features']
-
-        if type == 'center' or type == 'occ' or type == 'center_det':
-            if model_cfg.get('BACKBONE_3D', None) is None:
-                return None, model_info_dict
-            backbone_3d_module = backbones_3d.__all__[model_cfg.BACKBONE_3D.NAME](
-                model_cfg=model_cfg.BACKBONE_3D,
-                input_channels=input_channels,
-                grid_size=model_info_dict['occ_grid_size'] if type == 'occ' else model_info_dict['center_grid_size'],
-                voxel_size=model_info_dict['occ_voxel_size'] if type == 'occ' else model_info_dict['center_voxel_size'],
-                point_cloud_range=model_info_dict['point_cloud_range'],
-                original_num_rawpoint_features=self.dataset.point_feature_encoder.num_point_features,
-                type=type,
-            )
-        else:
-            if self.model_cfg.get('BACKBONE_3D', None) is None:
-                return None, model_info_dict
-            backbone_3d_module = backbones_3d.__all__[self.model_cfg.BACKBONE_3D.NAME](
-                model_cfg=self.model_cfg.BACKBONE_3D,
-                input_channels=model_info_dict['num_point_features'],
-                grid_size=model_info_dict['grid_size'],
-                voxel_size=model_info_dict['voxel_size'],
-                point_cloud_range=model_info_dict['point_cloud_range']
-            )
-
-        if type == 'occ':
-            model_info_dict['occ_module_list'].append(backbone_3d_module)
-            model_info_dict['num_occ_3d_features'] = backbone_3d_module.num_point_features
-        elif type == 'center':
-            model_info_dict['center_module_list'].append(backbone_3d_module)
-            model_info_dict['num_center_point_features'] = backbone_3d_module.num_point_features
-        elif type == 'center_det':
-            model_info_dict['center_det_module_list'].append(backbone_3d_module)
-            model_info_dict['num_center_det_point_features'] = backbone_3d_module.num_point_features
-        else:
-            model_info_dict['module_list'].append(backbone_3d_module)
-            model_info_dict['num_point_features'] = backbone_3d_module.num_point_features
-            model_info_dict['backbone_channels'] = backbone_3d_module.backbone_channels \
-                if hasattr(backbone_3d_module, 'backbone_channels') else None
+        if self.model_cfg.get('BACKBONE_3D', None) is None:
+            return None, model_info_dict
+        backbone_3d_module = backbones_3d.__all__[self.model_cfg.BACKBONE_3D.NAME](
+            model_cfg=self.model_cfg.BACKBONE_3D,
+            input_channels=model_info_dict['num_point_features'],
+            grid_size=model_info_dict['grid_size'],
+            voxel_size=model_info_dict['voxel_size'],
+            point_cloud_range=model_info_dict['point_cloud_range']
+        )
+        model_info_dict['module_list'].append(backbone_3d_module)
+        model_info_dict['num_point_features'] = backbone_3d_module.num_point_features
+        model_info_dict['backbone_channels'] = backbone_3d_module.backbone_channels \
+            if hasattr(backbone_3d_module, 'backbone_channels') else None
         return backbone_3d_module, model_info_dict
 
     def build_map_to_bev_module(self, model_info_dict, type=None):
-        if type == 'center':
-            model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'occ':
-            model_cfg = self.model_cfg.OCC
-        elif type == 'center_det':
-            model_cfg = self.model_cfg.CENTER_DET
-
-        if type == 'center' or type == 'occ' or type == 'center_det':
-            if model_cfg.get('MAP_TO_BEV', None) is None:
-                return None, model_info_dict
-            map_to_bev_module = map_to_bev.__all__[model_cfg.MAP_TO_BEV.NAME](
-                model_cfg=model_cfg.MAP_TO_BEV,
-                grid_size=model_info_dict['occ_grid_size'] if type == 'occ' else model_info_dict['center_grid_size'],
-                occ_dim=self.occ_dim
-            )
-        elif type == "bev_shape":
+        if type == "bev_shape":
             model_cfg = self.model_cfg.BEV_SHAPE
             map_to_bev_module = map_to_bev.__all__[model_cfg.MAP_TO_BEV.NAME](
                 model_cfg=model_cfg.MAP_TO_BEV,
@@ -356,13 +129,7 @@ class Detector3DTemplate(nn.Module):
                 model_cfg=self.model_cfg.MAP_TO_BEV,
                 grid_size=model_info_dict['grid_size']
             )
-        if type == 'occ':
-            model_info_dict['occ_module_list'].append(map_to_bev_module)
-        elif type == 'center':
-            model_info_dict['center_module_list'].append(map_to_bev_module)
-        elif type == 'center_det':
-            model_info_dict['center_det_module_list'].append(map_to_bev_module)
-        elif type == 'bev_shape':
+        if type == 'bev_shape':
             model_info_dict['bev_shape_module_list'].append(map_to_bev_module)
         else:
             model_info_dict['module_list'].append(map_to_bev_module)
@@ -371,21 +138,7 @@ class Detector3DTemplate(nn.Module):
         return map_to_bev_module, model_info_dict
 
     def build_backbone_2d(self, model_info_dict, type=None):
-        if type == 'center':
-            model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'occ':
-            model_cfg = self.model_cfg.OCC
-        elif type == 'center_det':
-            model_cfg = self.model_cfg.CENTER_DET
-
-        if type == 'center' or type == 'occ' or type == 'center_det':
-            if model_cfg.get('BACKBONE_2D', None) is None:
-                return None, model_info_dict
-            backbone_2d_module = backbones_2d.__all__[model_cfg.BACKBONE_2D.NAME](
-                model_cfg=model_cfg.BACKBONE_2D,
-                input_channels=model_info_dict['num_bev_features'],
-            )
-        elif type == "bev_shape":
+        if type == "bev_shape":
             model_cfg = self.model_cfg.BEV_SHAPE
             backbone_2d_module = backbones_2d.__all__[model_cfg.BACKBONE_2D.NAME](
                 model_cfg=model_cfg.BACKBONE_2D,
@@ -399,17 +152,7 @@ class Detector3DTemplate(nn.Module):
                 # input_channels=model_info_dict['num_bev_features']
                 input_channels=self.model_cfg.BACKBONE_2D.INPUT_CHANNELS  # 融合一维bev特征 64
             )
-
-        if type == 'occ':
-            model_info_dict['occ_module_list'].append(backbone_2d_module)
-            model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
-        elif type == 'center':
-            model_info_dict['center_module_list'].append(backbone_2d_module)
-            model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
-        elif type == 'center_det':
-            model_info_dict['center_det_module_list'].append(backbone_2d_module)
-            model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
-        elif type == 'bev_shape':
+        if type == 'bev_shape':
             model_info_dict['bev_shape_module_list'].append(backbone_2d_module)
             model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
         else:
@@ -417,81 +160,8 @@ class Detector3DTemplate(nn.Module):
             model_info_dict['num_bev_features'] = backbone_2d_module.num_bev_features
         return backbone_2d_module, model_info_dict
 
-    def build_pfe(self, model_info_dict):
-        if self.model_cfg.get('PFE', None) is None:
-            return None, model_info_dict
-
-        pfe_module = pfe.__all__[self.model_cfg.PFE.NAME](
-            model_cfg=self.model_cfg.PFE,
-            voxel_size=model_info_dict['det_voxel_size'],
-            point_cloud_range=model_info_dict['point_cloud_range'],
-            num_bev_features=model_info_dict['num_bev_features'],
-            num_rawpoint_features=model_info_dict['num_rawpoint_features'],
-            original_num_rawpoint_features=self.dataset.point_feature_encoder.num_point_features,
-            pre_conv_num_bev_features=model_info_dict['pre_conv_num_bev_features']
-        )
-        model_info_dict['det_module_list'].append(pfe_module)
-        model_info_dict['num_point_features'] = pfe_module.num_point_features
-        model_info_dict['num_point_features_before_fusion'] = pfe_module.num_point_features_before_fusion
-        return pfe_module, model_info_dict
-
-    def build_occ_pfe(self, model_info_dict):
-        if self.model_cfg.get('OCC_PFE', None) is None:
-            return None, model_info_dict
-
-        pfe_module = pfe.__all__[self.model_cfg.OCC_PFE.NAME](
-            model_cfg=self.model_cfg.OCC_PFE,
-            voxel_size=model_info_dict['det_voxel_size'],
-            point_cloud_range=model_info_dict['point_cloud_range'],
-            num_bev_features=model_info_dict['num_bev_features'],
-            num_rawpoint_features=model_info_dict['num_rawpoint_features'],
-            original_num_rawpoint_features=self.dataset.point_feature_encoder.num_point_features,
-            pre_conv_num_bev_features=model_info_dict['pre_conv_num_bev_features']
-        )
-        model_info_dict['det_module_list'].append(pfe_module)
-        model_info_dict['num_point_features'] = pfe_module.num_point_features
-        model_info_dict['num_point_features_before_fusion'] = pfe_module.num_point_features_before_fusion
-        return pfe_module, model_info_dict
-
-    def build_occ_point_head(self, model_info_dict):
-        if self.model_cfg.get('OCC_POINT_HEAD', None) is None:
-            return None, model_info_dict
-
-        if self.model_cfg.OCC_POINT_HEAD.get('USE_POINT_FEATURES_BEFORE_FUSION', False):
-            num_point_features = model_info_dict['num_point_features_before_fusion']
-        else:
-            num_point_features = model_info_dict['num_point_features']
-
-        point_head_module = dense_heads.__all__[self.model_cfg.OCC_POINT_HEAD.NAME](
-            model_cfg=self.model_cfg.OCC_POINT_HEAD,
-            input_channels=num_point_features,
-            num_class=self.num_class if not self.model_cfg.OCC_POINT_HEAD.CLASS_AGNOSTIC else 1,
-            predict_boxes_when_training=self.model_cfg.get('ROI_HEAD', False)
-        )
-
-        model_info_dict['det_module_list'].append(point_head_module)
-        return point_head_module, model_info_dict
-
     def build_dense_head(self, model_info_dict, type=None):
-        if type == 'center':
-            model_cfg = self.model_cfg.CENTER_AREA
-        elif type == 'center_det':
-            model_cfg = self.model_cfg.CENTER_DET
-
-        if type == 'center' or type == 'center_det':
-            if model_cfg.get('DENSE_HEAD', None) is None:
-                return None, model_info_dict
-            dense_head_module = dense_heads.__all__[model_cfg.DENSE_HEAD.NAME](
-                model_cfg=model_cfg.DENSE_HEAD,
-                input_channels=model_info_dict['num_bev_features'],
-                num_class=self.num_class if not model_cfg.DENSE_HEAD.CLASS_AGNOSTIC else 1,
-                class_names=self.class_names,
-                grid_size=model_info_dict['center_grid_size'],
-                point_cloud_range=model_info_dict['point_cloud_range'],
-                predict_boxes_when_training=model_cfg.get('ROI_HEAD', False),
-                voxel_size=model_info_dict.get('center_voxel_size', False)
-            )
-        elif type == "bev_shape":
+        if type == "bev_shape":
             model_cfg = self.model_cfg.BEV_SHAPE
             dense_head_module = dense_heads.__all__[model_cfg.DENSE_HEAD.NAME](
                 model_cfg=model_cfg.DENSE_HEAD,
@@ -516,30 +186,29 @@ class Detector3DTemplate(nn.Module):
                 predict_boxes_when_training=self.model_cfg.get('ROI_HEAD', False),
                 voxel_size=model_info_dict.get('voxel_size', False)
             )
-        if type == 'center':
-            model_info_dict['center_module_list'].append(dense_head_module)
-        elif type == 'center_det':
-            model_info_dict['center_det_module_list'].append(dense_head_module)
-        elif type == 'bev_shape':
+        if type == 'bev_shape':
             model_info_dict['bev_shape_module_list'].append(dense_head_module)
         else:
             model_info_dict['module_list'].append(dense_head_module)
         return dense_head_module, model_info_dict
 
-    def build_occ_dense_head(self, model_info_dict, type=None):
-        model_cfg = self.model_cfg.OCC
-        if model_cfg.get('OCC_DENSE_HEAD', None) is None:
+    def build_pfe(self, model_info_dict):
+        if self.model_cfg.get('PFE', None) is None:
             return None, model_info_dict
-        occ_dense_head_module = occ_pnt.occ_dense_heads.__all__[model_cfg.OCC_DENSE_HEAD.NAME](
-            model_cfg=model_cfg,
-            data_cfg=self.dataset.dataset_cfg,
-            input_channels=model_info_dict['num_occ_3d_features'] if "num_occ_3d_features" in model_info_dict else
-            model_info_dict['num_bev_features'],
-            num_class=self.occ_num_class,
-            grid_size=model_info_dict['occ_grid_size'],
+
+        pfe_module = pfe.__all__[self.model_cfg.PFE.NAME](
+            model_cfg=self.model_cfg.PFE,
+            voxel_size=model_info_dict['det_voxel_size'],
+            point_cloud_range=model_info_dict['point_cloud_range'],
+            num_bev_features=model_info_dict['num_bev_features'],
+            num_rawpoint_features=model_info_dict['num_rawpoint_features'],
+            original_num_rawpoint_features=self.dataset.point_feature_encoder.num_point_features,
+            pre_conv_num_bev_features=model_info_dict['pre_conv_num_bev_features']
         )
-        model_info_dict['occ_module_list'].append(occ_dense_head_module)
-        return occ_dense_head_module, model_info_dict
+        model_info_dict['det_module_list'].append(pfe_module)
+        model_info_dict['num_point_features'] = pfe_module.num_point_features
+        model_info_dict['num_point_features_before_fusion'] = pfe_module.num_point_features_before_fusion
+        return pfe_module, model_info_dict
 
     def build_point_head(self, model_info_dict):
         if self.model_cfg.get('POINT_HEAD', None) is None:
@@ -692,75 +361,6 @@ class Detector3DTemplate(nn.Module):
             pred_dicts.append(record_dict)
 
         return pred_dicts, recall_dict
-
-    def occ_post_processing(self, batch_dict):
-        """
-        Args:
-            batch_dict:
-                batch_size:
-                batch_cls_preds: (B, num_boxes, num_classes | 1) or (N1+N2+..., num_classes | 1)
-                                or [(B, num_boxes, num_class1), (B, num_boxes, num_class2) ...]
-                multihead_label_mapping: [(num_class1), (num_class2), ...]
-                batch_box_preds: (B, num_boxes, 7+C) or (N1+N2+..., 7+C)
-                cls_preds_normalized: indicate whether batch_cls_preds is normalized
-                batch_index: optional (N1+N2+...)
-                has_class_labels: True/False
-                roi_labels: (B, num_rois)  1 .. num_classes
-                batch_pred_labels: (B, num_boxes, 1)
-        Returns:
-        """
-        general_cls_loss_mask = batch_dict['general_cls_loss_mask']
-        total = torch.sum(general_cls_loss_mask)
-        pos_mask = batch_dict["pos_mask"]
-        pos_num = torch.sum(pos_mask)
-        neg_mask = batch_dict["neg_mask"]
-        neg_num = torch.sum(neg_mask)
-        batch_pred_occ_prob = batch_dict['batch_pred_occ_prob']
-        precision, recall, f1 = self.call_precision_recall_f1(pos_num, pos_mask, batch_pred_occ_prob, 0.5)
-        match_dicts = {
-            "pos_num": pos_num.cpu(),
-            "neg_num": neg_num.cpu(),
-            "pos_all_num": batch_dict["pos_all_num"].cpu(),
-            "total": total.cpu(),
-            "precision": precision.cpu(),
-            "recall": recall.cpu(),
-            "f1": f1.cpu(),
-        }
-        if "occ_pnts" in batch_dict:
-            batch_size, added_occ_b_ind, occ_pnts, gt_boxes_num, gt_boxes = batch_dict["batch_size"], batch_dict[
-                "added_occ_b_ind"], batch_dict["occ_pnts"], batch_dict["gt_boxes_num"], batch_dict["gt_boxes"]
-
-            box_point_mask_lst, valid_b_point_ind_lst = point_box_utils.torch_points_in_box_3d_box_label_batch(
-                occ_pnts[..., :3], added_occ_b_ind.unsqueeze(-1), gt_boxes, gt_boxes_num, batch_size)
-            occ_point_lst = [occ_pnts[vox_ind, :] for vox_ind in valid_b_point_ind_lst]
-            occ_thresh_box_num = []
-            box_num_sum = sum(gt_boxes_num)
-            for i in range(1, 10):
-                thresh = i * 0.1
-                box_occ_num_sum = 0
-                for occ, mask in zip(occ_point_lst, box_point_mask_lst):
-                    thresh_ind = torch.nonzero(occ[..., 3] >= thresh)
-                    # print("thresh_ind", thresh_ind.shape, occ.shape, mask.shape)
-                    if thresh_ind.shape[0] > 0 and mask.shape[1] > 0:
-                        box_labels = torch.max(mask[thresh_ind[..., 0], :], dim=0)[0]
-                        box_occ_num_sum += torch.sum(box_labels).item()
-                occ_thresh_box_num.append(box_occ_num_sum)
-            match_dicts.update({
-                "box_num_sum": box_num_sum,
-                "occ_box_num": occ_thresh_box_num
-            })
-            # print(box_num_sum)
-            # print(occ_thresh_box_num)
-        return match_dicts, batch_dict
-
-    def call_precision_recall_f1(self, pos_num, pos_mask, batch_pred_occ_prob, thresh):
-        pos_predict = batch_pred_occ_prob >= thresh
-        pos_predict_num = torch.sum(pos_predict)
-        pos_correct = torch.sum(pos_mask & pos_predict)
-        precision = pos_correct / torch.clamp(pos_predict_num, min=1.0)
-        recall = pos_correct / torch.clamp(pos_num, min=1.0)
-        f1 = 2 * precision * recall / torch.clamp(precision + recall, min=1e-8)
-        return precision, recall, f1
 
     @staticmethod
     def generate_recall_record(box_preds, recall_dict, batch_index, data_dict=None, thresh_list=None):

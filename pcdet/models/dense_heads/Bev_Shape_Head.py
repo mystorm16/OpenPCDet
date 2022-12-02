@@ -372,7 +372,7 @@ class BevShapeHead(nn.Module):
         hm_binary = copy.deepcopy(data_dict['bev_hm'].detach())
         hm_prob = copy.deepcopy(data_dict['bev_hm'].detach())
 
-        mask = hm_binary > 0.3
+        mask = hm_binary > self.model_cfg.TRAIN_BEV_SHAPE_THRESH
         hm_binary[mask] = 1
         hm_binary[~mask] = 0
         hm_prob[~mask] = 0

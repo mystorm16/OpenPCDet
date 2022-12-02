@@ -35,7 +35,8 @@ class BaseBEVBackbone(nn.Module):
             cur_layers = [
                 nn.ZeroPad2d(1),  # 图像四周都填充0
                 nn.Conv2d(
-                    c_in_list[idx]+2, num_filters[idx], kernel_size=3,  # +1(融了一维特征) +2(融了两维特征)
+                    in_channels=c_in_list[idx]+self.model_cfg.FUSE_BEV if self.model_cfg.get('FUSE_BEV', None) is not None else c_in_list[idx],
+                    out_channels=num_filters[idx], kernel_size=3,  # +1(融了一维特征) +2(融了两维特征)
                     stride=layer_strides[idx], padding=0, bias=False
                 ),
                 nn.BatchNorm2d(num_filters[idx], eps=1e-3, momentum=0.01),

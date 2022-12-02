@@ -23,7 +23,7 @@ DATA_CONFIG:
           }
 
         - NAME: bev_shape_mask_transform_points_to_voxels
-          TRAIN_BEV_SHAPE: False
+          TRAIN_BEV_SHAPE: True
           VOXEL_SIZE: [ 0.16, 0.16, 4 ]
           MAX_POINTS_PER_VOXEL: 1
           MAX_NUMBER_OF_VOXELS: {
@@ -49,11 +49,11 @@ DATA_CONFIG:
               REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
               LIMIT_WHOLE_SCENE: False
 
-#            - NAME: add_multi_best_match
-#              CAR_MLT_BM_ROOT: bm_50maxdist_2num_car
-#              CYC_MLT_BM_ROOT: bm_5maxdist_2num_Cyclist
-#              PED_MLT_BM_ROOT: bm_5maxdist_2num_Pedestrian
-#              NUM_POINT_FEATURES: 3
+            - NAME: add_multi_best_match
+              CAR_MLT_BM_ROOT: bm_50maxdist_2num_car
+              CYC_MLT_BM_ROOT: bm_5maxdist_2num_Cyclist
+              PED_MLT_BM_ROOT: bm_5maxdist_2num_Pedestrian
+              NUM_POINT_FEATURES: 3
 
             - NAME: random_world_flip
               ALONG_AXIS_LIST: ['x']
@@ -67,7 +67,7 @@ DATA_CONFIG:
 MODEL:
     NAME: Bev_Shape_Pillar
     BEV_SHAPE:
-        TRAIN_BEV_SHAPE: False
+        TRAIN_BEV_SHAPE: True
         VFE:
             NAME: PillarVFE
             WITH_DISTANCE: False
@@ -90,7 +90,7 @@ MODEL:
         DENSE_HEAD:
             NAME: BevShapeHead
 
-            TRAIN_BEV_SHAPE_THRESH: 0.6  # bev 输出阈值
+            TRAIN_BEV_SHAPE_THRESH: 0.3  # bev 输出阈值
             CLASS_AGNOSTIC: False
             CLASS_NAMES_EACH_HEAD: [
                 [ 'Car', 'Pedestrian', 'Cyclist' ]
@@ -141,6 +141,7 @@ MODEL:
         UPSAMPLE_STRIDES: [1, 2, 4]  # 每个block的降采样步长
         NUM_UPSAMPLE_FILTERS: [128, 128, 128]  # 上采样卷积个数
         INPUT_CHANNELS: 64  # 2D卷积输入通道数
+        FUSE_BEV: 2 # 融合几维BEV特征
 
     DENSE_HEAD:
         NAME: AnchorHeadSingle
