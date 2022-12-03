@@ -23,7 +23,7 @@ DATA_CONFIG:
           }
 
         - NAME: bev_shape_mask_transform_points_to_voxels  # 为了训练bev shape进行的预处理
-          TRAIN_BEV_SHAPE: True
+          TRAIN_BEV_SHAPE: False
           VOXEL_SIZE: [ 0.16, 0.16, 4 ]
           MAX_POINTS_PER_VOXEL: 1
           MAX_NUMBER_OF_VOXELS: {
@@ -50,7 +50,7 @@ DATA_CONFIG:
               LIMIT_WHOLE_SCENE: False
 
             - NAME: add_multi_best_match
-              TRAIN_BEV_SHAPE: True
+              TRAIN_BEV_SHAPE: False
               CAR_MLT_BM_ROOT: bm_50maxdist_2num_car
               CYC_MLT_BM_ROOT: bm_5maxdist_2num_Cyclist
               PED_MLT_BM_ROOT: bm_5maxdist_2num_Pedestrian
@@ -67,7 +67,7 @@ DATA_CONFIG:
 
 MODEL:
     NAME: Bev_Shape_Pillar
-    TRAIN_BEV_SHAPE: True
+    TRAIN_BEV_SHAPE: False
     BEV_SHAPE:
         VFE:
             NAME: PillarVFE
