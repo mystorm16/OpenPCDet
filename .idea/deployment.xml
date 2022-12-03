@@ -2,6 +2,24 @@
 <project version="4">
   <component name="PublishConfigData" serverName="porser 3090" remoteFilesAllowedToDisappearOnAutoupload="false" showEqualInSync="true">
     <serverData>
+      <paths name="new 3090">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/btc_center" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/build" />
+            <excludedPath local="true" path="$PROJECT_DIR$/ckpt" />
+            <excludedPath local="true" path="$PROJECT_DIR$/data" />
+            <excludedPath local="true" path="$PROJECT_DIR$/docker" />
+            <excludedPath local="true" path="$PROJECT_DIR$/docs" />
+            <excludedPath local="true" path="$PROJECT_DIR$/output" />
+            <excludedPath local="true" path="$PROJECT_DIR$/pcdet.egg-info" />
+            <excludedPath local="true" path="$PROJECT_DIR$/sy_add" />
+            <excludedPath local="true" path="$PROJECT_DIR$/pcdet/ops" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
       <paths name="porser 3090">
         <serverdata>
           <mappings>

@@ -2,8 +2,6 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import DistributedSampler as _DistributedSampler
 
-from btcdet.utils import common_utils
-
 from .dataset import DatasetTemplate
 from .kitti.kitti_dataset import KittiDataset
 

@@ -36,6 +36,8 @@ class Bev_Shape_Pillar(Detector3DTemplate):
         disp_dict = {}
         loss_bev_shape, tb_dict = self.bev_shape_modules.dense_head.get_loss_bev_shape()
         loss_rpn, tb_dict = self.dense_head.get_loss()
+        loss_bev_shape = 10*loss_bev_shape
+        loss = loss_rpn + loss_bev_shape
 
         tb_dict = {
             'loss_rpn': loss_rpn.item(),
@@ -43,5 +45,4 @@ class Bev_Shape_Pillar(Detector3DTemplate):
             **tb_dict
         }
 
-        loss = loss_rpn + 2*loss_bev_shape
         return loss, tb_dict, disp_dict
