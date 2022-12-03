@@ -23,8 +23,6 @@ class DatasetTemplate(torch_data.Dataset):
         if self.dataset_cfg is None or class_names is None:
             return
         self.point_cloud_range = np.array(self.dataset_cfg.POINT_CLOUD_RANGE, dtype=np.float32)
-        self.occ_point_cloud_range = self.point_cloud_range if dataset_cfg.get('OCC', None) is None else np.array(
-            self.dataset_cfg.OCC.POINT_CLOUD_RANGE, dtype=np.float32)
 
         self.point_feature_encoder = PointFeatureEncoder(
             self.dataset_cfg.POINT_FEATURE_ENCODING,
@@ -32,17 +30,11 @@ class DatasetTemplate(torch_data.Dataset):
         )
         self.data_augmentor = DataAugmentor(
             self.root_path, self.dataset_cfg.DATA_AUGMENTOR, self.class_names, logger=self.logger
-        ) if self.training or self.dataset_cfg.DATA_AUGMENTOR.AUG_CONFIG_LIST[1].NAME in ["add_best_match",
-                                                                                          "add_multi_best_match"] else None
-        self.data_processor = DataProcessor(
-            self.dataset_cfg.DATA_PROCESSOR, point_cloud_range=self.occ_point_cloud_range, training=self.training,
-            occ_config=dataset_cfg.get('OCC', None), det_point_cloud_range=self.point_cloud_range)
-        self.occ_dim = self.data_processor.occ_dim
+        ) if self.training else None
 
-        self.center_grid_size = getattr(self.data_processor, 'center_grid_size', None)
-        self.center_voxel_size = getattr(self.data_processor, 'center_voxel_size', None)
-        self.occ_grid_size = getattr(self.data_processor, 'occ_grid_size', None)
-        self.occ_voxel_size = getattr(self.data_processor, 'occ_voxel_size', None)
+        self.data_processor = DataProcessor(
+            self.dataset_cfg.DATA_PROCESSOR, point_cloud_range=self.point_cloud_range, training=self.training)
+
         self.grid_size = getattr(self.data_processor, 'grid_size', None)
         self.voxel_size = getattr(self.data_processor, 'voxel_size', None)
         self.min_points_in_box = self.dataset_cfg.get("MIN_POINTS_IN_BOX", 0)
@@ -142,15 +134,6 @@ class DatasetTemplate(torch_data.Dataset):
                 if len(data_dict['gt_boxes']) == 0:
                     new_index = np.random.randint(self.__len__())
                     return self.__getitem__(new_index)
-        elif self.dataset_cfg.DATA_AUGMENTOR.AUG_CONFIG_LIST[1].NAME == "add_best_match" or \
-                self.dataset_cfg.DATA_AUGMENTOR.AUG_CONFIG_LIST[1].NAME == "add_multi_best_match":
-            data_dict = self.data_augmentor.forward(
-                data_dict={
-                    **data_dict,
-                    'gt_boxes_mask': gt_boxes_mask
-                },
-                validation=True
-            )
 
         if data_dict.get('gt_boxes', None) is not None:
             selected = common_utils.keep_arrays_by_name(data_dict['gt_names'], self.class_names)

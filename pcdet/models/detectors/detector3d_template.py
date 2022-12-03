@@ -29,6 +29,7 @@ class Detector3DTemplate(nn.Module):
         self.bev_shape_modules = nn.Module()
         self.clamp_max = self.dataset.dataset_cfg.get("CLAMP", None)
         self.print = False
+        self.train_bev_shape = model_cfg.TRAIN_BEV_SHAPE
 
     @property
     def mode(self):
@@ -117,10 +118,12 @@ class Detector3DTemplate(nn.Module):
 
     def build_map_to_bev_module(self, model_info_dict, type=None):
         if type == "bev_shape":
+            train_bev_shape = self.train_bev_shape
             model_cfg = self.model_cfg.BEV_SHAPE
             map_to_bev_module = map_to_bev.__all__[model_cfg.MAP_TO_BEV.NAME](
                 model_cfg=model_cfg.MAP_TO_BEV,
-                grid_size=model_info_dict['grid_size']
+                grid_size=model_info_dict['grid_size'],
+                train_bev_shape=train_bev_shape
             )
         else:
             if self.model_cfg.get('MAP_TO_BEV', None) is None:
@@ -161,6 +164,7 @@ class Detector3DTemplate(nn.Module):
         return backbone_2d_module, model_info_dict
 
     def build_dense_head(self, model_info_dict, type=None):
+        train_bev_shape = self.train_bev_shape
         if type == "bev_shape":
             model_cfg = self.model_cfg.BEV_SHAPE
             dense_head_module = dense_heads.__all__[model_cfg.DENSE_HEAD.NAME](
@@ -171,7 +175,8 @@ class Detector3DTemplate(nn.Module):
                 grid_size=model_info_dict['grid_size'],
                 point_cloud_range=model_info_dict['point_cloud_range'],
                 predict_boxes_when_training=model_cfg.get('ROI_HEAD', False),
-                voxel_size=model_info_dict.get('voxel_size', False)
+                voxel_size=model_info_dict.get('voxel_size', False),
+                train_bev_shape=train_bev_shape
             )
         else:
             if self.model_cfg.get('DENSE_HEAD', None) is None:

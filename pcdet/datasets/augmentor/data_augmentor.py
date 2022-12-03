@@ -37,7 +37,9 @@ class DataAugmentor(object):
                         infos = pickle.load(f)
                         [self.db_infos[cur_class].extend(infos[cur_class]) for cur_class in class_names]
                         print("self.db_infos", self.db_infos.keys())
-
+            if cur_cfg.NAME == 'add_multi_best_match':
+                if cur_cfg.TRAIN_BEV_SHAPE == False:
+                    continue
             cur_augmentor = getattr(self, cur_cfg.NAME)(config=cur_cfg)
             self.data_augmentor_queue.append(cur_augmentor)
 

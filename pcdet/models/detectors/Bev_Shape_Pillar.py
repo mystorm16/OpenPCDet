@@ -11,10 +11,8 @@ class Bev_Shape_Pillar(Detector3DTemplate):
     def __init__(self, model_cfg, num_class, dataset):
         super().__init__(model_cfg=model_cfg, num_class=num_class, dataset=dataset)
         self.bev_shape_module_lists, self.module_list = self.build_networks()
-        self.train_bev_shape = model_cfg.BEV_SHAPE.TRAIN_BEV_SHAPE
 
     def forward(self, batch_dict):
-        batch_dict['train_bev_shape'] = self.train_bev_shape
         for cur_module in self.bev_shape_module_lists:
             batch_dict = cur_module(batch_dict)
 
@@ -36,7 +34,6 @@ class Bev_Shape_Pillar(Detector3DTemplate):
         disp_dict = {}
         loss_bev_shape, tb_dict = self.bev_shape_modules.dense_head.get_loss_bev_shape()
         loss_rpn, tb_dict = self.dense_head.get_loss()
-        loss_bev_shape = 10*loss_bev_shape
         loss = loss_rpn + loss_bev_shape
 
         tb_dict = {

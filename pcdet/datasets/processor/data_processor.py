@@ -67,14 +67,7 @@ class DataProcessor(object):
         self.training = training
         self.mode = 'train' if training else 'test'
         self.grid_size = self.voxel_size = None
-        self.occ_config = kwargs["occ_config"]
-        self.det_point_cloud_range = kwargs["det_point_cloud_range"]
         self.data_processor_queue = []
-        self.occ_dim = None
-
-        self.voxel_generator_det = None
-        self.voxel_generator_occ = None
-        self.voxel_generator_center = None
         self.voxel_generator = None
         self.voxel_generator_bm = None
 
@@ -86,7 +79,7 @@ class DataProcessor(object):
     def mask_points_and_boxes_outside_range(self, data_dict=None, config=None):
         if data_dict is None:
             return partial(self.mask_points_and_boxes_outside_range, config=config)
-        mask = common_utils.mask_points_by_range(data_dict['points'], self.det_point_cloud_range)
+        mask = common_utils.mask_points_by_range(data_dict['points'], self.point_cloud_range)
         data_dict['points'] = data_dict['points'][mask]
         if 'pre_rot_points' in data_dict:
             data_dict['pre_rot_points'] = data_dict['pre_rot_points'][mask]
@@ -94,7 +87,7 @@ class DataProcessor(object):
         # print("points", np.min(data_dict['points'], axis=0), np.max(data_dict['points'], axis=0))
         if data_dict.get('gt_boxes', None) is not None and config.REMOVE_OUTSIDE_BOXES and self.training:
             mask = box_utils.mask_boxes_outside_range_numpy(
-                data_dict['gt_boxes'], self.det_point_cloud_range, min_num_corners=config.get('min_num_corners', 1)
+                data_dict['gt_boxes'], self.point_cloud_range, min_num_corners=config.get('min_num_corners', 1)
             )
             data_dict['gt_boxes'] = data_dict['gt_boxes'][mask]
 

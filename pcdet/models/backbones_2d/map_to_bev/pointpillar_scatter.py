@@ -7,10 +7,10 @@ sns.set()
 class PointPillarScatter(nn.Module):
     def __init__(self, model_cfg, grid_size, **kwargs):
         super().__init__()
-
         self.model_cfg = model_cfg
         self.num_bev_features = self.model_cfg.NUM_BEV_FEATURES
         self.nx, self.ny, self.nz = grid_size
+        self.train_bev_shape = kwargs['train_bev_shape'] if kwargs.__contains__('train_bev_shape') else False
         assert self.nz == 1
 
     def forward(self, batch_dict, **kwargs):
@@ -40,7 +40,7 @@ class PointPillarScatter(nn.Module):
         batch_spatial_features = batch_spatial_features.view(batch_size, 64 * self.nz, self.ny, self.nx)
         batch_dict['spatial_features'] = batch_spatial_features
 
-        if batch_dict['train_bev_shape'] == True:
+        if self.train_bev_shape == True:
             # bm points转2D BEV图
             batch_dict['bm_pillar_features'] = torch.ones(  # 先创建一个N*1的全1 tensor
                 batch_dict['bm_voxels'].shape[0], 1,

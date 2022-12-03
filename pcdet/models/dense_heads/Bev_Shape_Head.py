@@ -57,7 +57,7 @@ class SeparateHead(nn.Module):
 
 class BevShapeHead(nn.Module):
     def __init__(self, model_cfg, input_channels, num_class, class_names, grid_size, point_cloud_range, voxel_size,
-                 predict_boxes_when_training=True):
+                 predict_boxes_when_training=True, **kwargs):
         super().__init__()
         self.model_cfg = model_cfg
         self.num_class = num_class
@@ -105,6 +105,7 @@ class BevShapeHead(nn.Module):
         self.predict_boxes_when_training = predict_boxes_when_training
         self.forward_ret_dict = {}
         self.build_losses()
+        self.train_bev_shape = kwargs['train_bev_shape'] if kwargs.__contains__('train_bev_shape') else False
 
     def build_losses(self):
         self.add_module('hm_loss_func', loss_utils.FocalLossCenterNet())
@@ -356,7 +357,7 @@ class BevShapeHead(nn.Module):
         for head in self.heads_list:
             pred_dicts.append(head(x))  # 对降维到64后的BEV feature每个像素位置预测center 1、centerz 1、dim 3、rot 2、hm 1
 
-        if data_dict['train_bev_shape'] == True:
+        if self.train_bev_shape == True:
             # 利用真值生成了基于高斯分布的heatmap
             target_dict = self.sy_assign_targets(
                 data_dict, feature_map_size=spatial_features_2d.size()[2:],
@@ -372,7 +373,7 @@ class BevShapeHead(nn.Module):
         hm_binary = copy.deepcopy(data_dict['bev_hm'].detach())
         hm_prob = copy.deepcopy(data_dict['bev_hm'].detach())
 
-        mask = hm_binary > self.model_cfg.TRAIN_BEV_SHAPE_THRESH
+        mask = hm_binary > self.model_cfg.BEV_SHAPE_THRESH
         hm_binary[mask] = 1
         hm_binary[~mask] = 0
         hm_prob[~mask] = 0
