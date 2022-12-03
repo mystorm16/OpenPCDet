@@ -62,9 +62,8 @@ def train_one_epoch_multi_opt(model, optimizer_lst, train_loader, model_func, lr
                               'lr_occ': cur_lr_lst[0], 'lr_center': cur_lr_lst[1]})
         else:
             disp_dict.update({'loss': loss.item(),
-                              # 'loss_center_area': tb_dict['loss_center_area'].item(),
-                              # 'occ_loss_rpn': tb_dict['occ_loss_rpn'].item(),
-                              # 'loss_center_det': tb_dict['loss_center_det'].item(),
+                              'loss_rpn': tb_dict['loss_rpn'],
+                              'loss_bev': tb_dict['loss_bev_shape'],
                               'lr': cur_lr_lst[0]})
 
         # log to console and tensorboard
