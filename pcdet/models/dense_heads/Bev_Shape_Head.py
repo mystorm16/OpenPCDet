@@ -370,8 +370,9 @@ class BevShapeHead(nn.Module):
 
 
         # 按阈值二分类
-        hm_binary = copy.deepcopy(data_dict['bev_hm'].detach())
-        hm_prob = copy.deepcopy(data_dict['bev_hm'].detach())
+        #hm_binary = copy.deepcopy(data_dict['bev_hm'])
+        hm_binary = data_dict['bev_hm'].clone()
+        hm_prob = data_dict['bev_hm'].clone()
 
         mask = hm_binary > self.model_cfg.BEV_SHAPE_THRESH
         hm_binary[mask] = 1

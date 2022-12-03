@@ -91,7 +91,7 @@ MODEL:
         DENSE_HEAD:
             NAME: BevShapeHead
 
-            BEV_SHAPE_THRESH: 0.3  # bev 输出阈值
+            BEV_SHAPE_THRESH: 0.4  # bev 输出阈值
             CLASS_AGNOSTIC: False
             CLASS_NAMES_EACH_HEAD: [
                 [ 'Car', 'Pedestrian', 'Cyclist' ]
@@ -117,11 +117,6 @@ MODEL:
                 LOSS_WEIGHTS: {
                     'cls_weight': 1.0,
                 }
-
-        POST_PROCESSING:
-            RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
-            SCORE_THRESH: 0.5
-            POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
 
     VFE:
       NAME: PillarVFE

@@ -108,10 +108,14 @@ class BaseBEVBackbone(nn.Module):
         # 融合hm特征
         if data_dict.__contains__('hm_binary_fuse'):
             flag_fuse_features = True
-            data_dict['hm_binary_fuse'] = data_dict['hm_binary_fuse'].detach()
-            data_dict['hm_prob_fuse'] = data_dict['hm_prob_fuse'].detach()
-            # x = torch.cat((x, data_dict['hm_binary_fuse']), dim=1)
+            # data_dict['hm_binary_fuse'] = data_dict['hm_binary_fuse'].detach()
+            # data_dict['hm_prob_fuse'] = data_dict['hm_prob_fuse'].detach()
+
             # vis = data_dict['hm_binary_fuse'][0][0].detach().cpu().numpy()
+            # fig = plt.figure(figsize=(10, 10))
+            # sns.heatmap(vis)
+            # plt.show()
+            # vis = data_dict['hm_prob_fuse'][0][0].detach().cpu().numpy()
             # fig = plt.figure(figsize=(10, 10))
             # sns.heatmap(vis)
             # plt.show()
