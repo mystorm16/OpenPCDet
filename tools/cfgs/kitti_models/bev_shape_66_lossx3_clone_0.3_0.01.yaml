@@ -23,7 +23,7 @@ DATA_CONFIG:
           }
 
         - NAME: bev_shape_mask_transform_points_to_voxels  # 为了训练bev shape进行的预处理
-          TRAIN_BEV_SHAPE: False
+          TRAIN_BEV_SHAPE: True
           VOXEL_SIZE: [ 0.16, 0.16, 4 ]
           MAX_POINTS_PER_VOXEL: 1
           MAX_NUMBER_OF_VOXELS: {
@@ -50,7 +50,7 @@ DATA_CONFIG:
               LIMIT_WHOLE_SCENE: False
 
             - NAME: add_multi_best_match
-              TRAIN_BEV_SHAPE: False
+              TRAIN_BEV_SHAPE: True
               CAR_MLT_BM_ROOT: bm_50maxdist_2num_car
               CYC_MLT_BM_ROOT: bm_5maxdist_2num_Cyclist
               PED_MLT_BM_ROOT: bm_5maxdist_2num_Pedestrian
@@ -67,7 +67,7 @@ DATA_CONFIG:
 
 MODEL:
     NAME: Bev_Shape_Pillar
-    TRAIN_BEV_SHAPE: False
+    TRAIN_BEV_SHAPE: True
     BEV_SHAPE:
         VFE:
             NAME: PillarVFE
@@ -90,7 +90,6 @@ MODEL:
 
         DENSE_HEAD:
             NAME: BevShapeHead
-
             BEV_SHAPE_THRESH: 0.3  # bev 输出阈值
             CLASS_AGNOSTIC: False
             CLASS_NAMES_EACH_HEAD: [
@@ -115,8 +114,13 @@ MODEL:
 
             LOSS_CONFIG:
                 LOSS_WEIGHTS: {
-                    'cls_weight': 1.0,
+                    'cls_weight': 3.0,  # bev loss权重
                 }
+
+        POST_PROCESSING:
+            RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+            SCORE_THRESH: 0.5
+            POST_CENTER_LIMIT_RANGE: [-80, -80, -10.0, 80, 80, 10.0]
 
     VFE:
       NAME: PillarVFE
